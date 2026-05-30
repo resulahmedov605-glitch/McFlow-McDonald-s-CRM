@@ -1,0 +1,1 @@
+Bunu et: Mobile - da navbardakilara click etmek olsun, yeni click edende scale ile falan deyisin.
