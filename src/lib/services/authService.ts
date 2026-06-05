@@ -24,6 +24,7 @@ export type MeResponse = {
   createdAt: string;
   updatedAt: string;
   loginedAt: string;
+
 };
 
 export const login = async (request: LoginRequest) => {
@@ -46,5 +47,13 @@ export const verify = async (request: VerifyRequest) => {
 
 export const getMe = async () => {
   const response = await api.get<MeResponse>("/api/Auth/me");
+  return response.data;
+};
+
+export const refreshToken = async () => {
+  const response = await api.post<VerifyResponse>("/api/Auth/refresh-token", {
+    accessToken: localStorage.getItem("mcflow_access_token") || "",
+    refreshToken: localStorage.getItem("mcflow_refresh_token") || ""
+  });
   return response.data;
 };

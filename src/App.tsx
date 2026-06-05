@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import Login from "./pages/Login";
 import VerifyQR from "./pages/Verify";
@@ -9,6 +10,8 @@ import Footer from "./components/Footer";
 import Drawer from "./components/Drawer";
 import PageLoader from "./components/PageLoader";
 import ErrorPage from "./pages/ErrorPage";
+import Employee from "./pages/Employee";
+import { useThemeStore } from "./store/useThemeStore";
 
 const RootLayout = () => {
   return (
@@ -35,6 +38,7 @@ const routes = createBrowserRouter([
       { path: "/login", element: <Login /> },
       { path: "/verify", element: <VerifyQR /> },
       { path: "/profile", element: <Profile /> },
+      { path: "/employee", element: <Employee /> },
       { index: true, element: <Dashboard /> },
     ],
   },
@@ -45,6 +49,19 @@ const routes = createBrowserRouter([
 ]);
 
 const App = () => {
+  const syncSystemTheme = useThemeStore((state) => state.syncSystemTheme);
+
+  useEffect(() => {
+    const themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleSystemThemeChange = () => syncSystemTheme();
+
+    syncSystemTheme();
+    themeMedia.addEventListener("change", handleSystemThemeChange);
+
+    return () =>
+      themeMedia.removeEventListener("change", handleSystemThemeChange);
+  }, [syncSystemTheme]);
+
   return <RouterProvider router={routes} />;
 };
 

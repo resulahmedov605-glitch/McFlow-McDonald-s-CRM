@@ -6,6 +6,7 @@ import {
   ChevronDown,
   Globe2,
   LayoutGrid,
+  Monitor,
   Menu,
   Moon,
   Package,
@@ -19,7 +20,10 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import { languageOptions, type LanguageCode } from "../locales/languages";
 import { useLanguageStore } from "../store/useLanguageStore";
-import { useThemeStore } from "../store/useThemeStore";
+import {
+  useThemeStore,
+  type ThemePreference,
+} from "../store/useThemeStore";
 import useAuthStore from "../store/authStore";
 
 const navItems = [
@@ -48,6 +52,12 @@ const workspaceItems = [
   { label: "Settings", icon: Settings },
 ];
 
+const themeOptions = [
+  { value: "light", label: "Light", icon: SunDim },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+] as const;
+
 const Navbar = () => {
   const { user } = useAuthStore();
   const navbarRef = useRef<HTMLDivElement>(null);
@@ -56,9 +66,13 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isContactOpen, setIsContactOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+  const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const theme = useThemeStore((state) => state.theme);
-  const toggleTheme = useThemeStore((state) => state.toggleTheme);
+  const themePreference = useThemeStore((state) => state.themePreference);
+  const setThemePreference = useThemeStore(
+    (state) => state.setThemePreference
+  );
   const language = useLanguageStore((state) => state.language);
   const setLanguage = useLanguageStore((state) => state.setLanguage);
   const navigate = useNavigate();
@@ -83,16 +97,25 @@ const Navbar = () => {
   const handleContactToggle = () => {
     setIsContactOpen((open) => !open);
     setIsLanguageOpen(false);
+    setIsThemeOpen(false);
   };
 
   const handleLanguageToggle = () => {
     setIsLanguageOpen((open) => !open);
     setIsContactOpen(false);
+    setIsThemeOpen(false);
   };
 
   const handleThemeToggle = () => {
+    setIsThemeOpen((open) => !open);
+    setIsLanguageOpen(false);
+    setIsContactOpen(false);
+  };
+
+  const handleThemeChange = (themePreference: ThemePreference) => {
     setIsPopping(true);
-    toggleTheme();
+    setThemePreference(themePreference);
+    setIsThemeOpen(false);
     setTimeout(() => setIsPopping(false), 160);
   };
 
@@ -104,6 +127,7 @@ const Navbar = () => {
     setIsMenuOpen(false);
     setIsContactOpen(false);
     setIsLanguageOpen(false);
+    setIsThemeOpen(false);
     setIsWorkspaceOpen(false);
     navigate("/profile");
   };
@@ -129,6 +153,7 @@ const Navbar = () => {
         setIsMenuOpen(false);
         setIsContactOpen(false);
         setIsLanguageOpen(false);
+        setIsThemeOpen(false);
         setIsWorkspaceOpen(false);
       }
     };
@@ -141,7 +166,7 @@ const Navbar = () => {
   return (
     <div
       ref={navbarRef}
-      className="relative bg-red-500 w-full h-23 flex items-center justify-start p-2.5"
+      className="relative z-40 bg-red-500 w-full h-23 flex items-center justify-start p-2.5"
     >
       <img
         src="McFlow.svg"
@@ -245,22 +270,67 @@ const Navbar = () => {
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleThemeToggle}
-          aria-label={isLight ? t("theme.dark") : t("theme.light")}
-          className="flex size-12 items-center justify-center rounded-full border-2 border-amber-300 shadow-md touch-manipulation transition-all duration-300 ease-in-out hover:cursor-pointer hover:scale-105 hover:bg-gray-800 hover:shadow-gray-700 active:scale-95 active:bg-gray-800"
-        >
-          <span
-            className={`flex items-center justify-center transition-all duration-300 ease-in-out ${
-              isLight
-                ? "rotate-180 text-yellow-200"
-                : "-rotate-12 text-blue-100"
-            } ${isPopping ? "scale-125" : isLight ? "scale-110" : "scale-100"}`}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={handleThemeToggle}
+            aria-label="Theme menu"
+            aria-expanded={isThemeOpen}
+            className="flex size-12 items-center justify-center rounded-full border-2 border-amber-300 shadow-md touch-manipulation transition-all duration-300 ease-in-out hover:cursor-pointer hover:scale-105 hover:bg-gray-800 hover:shadow-gray-700 active:scale-95 active:bg-gray-800"
           >
-            {isLight ? <SunDim size={17} /> : <Moon size={17} />}
-          </span>
-        </button>
+            <span
+              className={`flex items-center justify-center transition-all duration-300 ease-in-out ${
+                isLight
+                  ? "rotate-180 text-yellow-200"
+                  : "-rotate-12 text-blue-100"
+              } ${isPopping ? "scale-125" : isLight ? "scale-110" : "scale-100"}`}
+            >
+              {isLight ? <SunDim size={17} /> : <Moon size={17} />}
+            </span>
+          </button>
+
+          <div
+            className={`absolute right-0 top-14 z-20 grid w-44 gap-1 rounded-md border p-2 text-sm shadow-lg transition-all duration-200 ease-in-out ${
+              isLight
+                ? "border-gray-200 bg-white text-gray-800 shadow-gray-900/15"
+                : "border-gray-600 bg-gray-800 text-gray-100 shadow-gray-950/40"
+            } ${
+              isThemeOpen
+                ? "pointer-events-auto translate-y-0 opacity-100"
+                : "pointer-events-none -translate-y-2 opacity-0"
+            }`}
+          >
+            {themeOptions.map(({ value, label, icon: Icon }) => {
+              const isActive = themePreference === value;
+
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => handleThemeChange(value)}
+                  className={`flex items-center gap-3 rounded-md border p-2 text-left font-semibold transition-all duration-200 ease-in-out hover:cursor-pointer ${
+                    isActive
+                      ? isLight
+                        ? "border-red-300 bg-amber-50 text-red-700"
+                        : "border-amber-300 bg-red-500/20 text-amber-100"
+                      : isLight
+                      ? "border-transparent hover:border-amber-200 hover:bg-amber-50"
+                      : "border-transparent hover:border-gray-500 hover:bg-gray-700"
+                  }`}
+                >
+                  <Icon size={16} />
+                  <span className="flex-1">{label}</span>
+                  {isActive && (
+                    <Check
+                      size={15}
+                      className={isLight ? "text-red-500" : "text-amber-200"}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <button
           type="button"
@@ -388,22 +458,32 @@ const Navbar = () => {
             setIsMenuOpen(false);
             setIsContactOpen(false);
             setIsLanguageOpen(false);
+            setIsThemeOpen(false);
           }}
           aria-label="Open workspace menu"
-          className="fixed bottom-5 right-5 z-20 flex size-14 items-center justify-center rounded-full border-2 border-amber-300 bg-red-500 text-white shadow-xl shadow-red-950/25 touch-manipulation transition-all duration-200 ease-in-out hover:cursor-pointer active:scale-95 md:hidden"
+          className="fixed bottom-42 right-3 z-20 flex size-14 items-center justify-center rounded-full border-2 border-amber-300 bg-red-500 text-white shadow-xl shadow-red-950/25 touch-manipulation transition-all duration-300 ease-out hover:cursor-pointer active:scale-95 md:hidden"
         >
           <LayoutGrid size={23} />
         </button>
       )}
 
-      {isWorkspaceOpen && (
+      {user && (
         <div
           onClick={() => setIsWorkspaceOpen(false)}
-          className="fixed inset-0 z-30 bg-black/35 backdrop-blur-[2px] md:hidden"
+          aria-hidden={!isWorkspaceOpen}
+          className={`fixed inset-0 z-30 bg-black/35 backdrop-blur-[2px] transition-all duration-300 ease-out md:hidden ${
+            isWorkspaceOpen
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
+          }`}
         >
           <div
             onClick={(event) => event.stopPropagation()}
-            className={`absolute inset-x-0 bottom-0 rounded-t-2xl border-t px-4 pb-5 pt-4 shadow-2xl transition-colors duration-300 ${
+            className={`absolute inset-x-0 bottom-0 rounded-t-2xl border-t px-4 pb-5 pt-4 shadow-2xl transition-all duration-300 ease-out ${
+              isWorkspaceOpen
+                ? "translate-y-0 opacity-100"
+                : "translate-y-full opacity-0"
+            } ${
               isLight
                 ? "border-amber-200 bg-white text-gray-900"
                 : "border-amber-300/30 bg-gray-800 text-white"

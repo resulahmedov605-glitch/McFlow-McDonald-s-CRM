@@ -1,25 +1,46 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart3,
-  BriefcaseBusiness,
+  Boxes,
   ChevronLeft,
   ChevronRight,
-  LayoutGrid,
+  CircleUserRound,
+  LayoutDashboard,
   Package,
-  Settings,
+  ShoppingCart,
   UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
 import useAuthStore from "../store/authStore";
 import { useThemeStore } from "../store/useThemeStore";
 
-const menuItems = [
-  { label: "Dashboard", icon: LayoutGrid, path: "/" },
-  { label: "Finance", icon: BriefcaseBusiness },
-  { label: "Products", icon: Package },
-  { label: "Customers", icon: UsersRound },
-  { label: "Analytics", icon: BarChart3 },
-];
+type MenuItem = {
+  label: string;
+  icon: LucideIcon;
+  path: string;
+};
+
+const normalizeRole = (role?: string) =>
+  role?.replace(/[\s_-]/g, "").toLowerCase() ?? "";
+
+const roleMenuItems: Record<string, MenuItem[]> = {
+  admin: [
+    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { label: "Product Items", icon: Boxes, path: "/product-items" },
+    { label: "Product", icon: Package, path: "/product" },
+    { label: "Orders", icon: ShoppingCart, path: "/orders" },
+    { label: "Employee", icon: UsersRound, path: "/employee" },
+  ],
+  cashier: [
+    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { label: "Orders", icon: ShoppingCart, path: "/orders" },
+  ],
+  warehousestaff: [
+    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { label: "Product Items", icon: Boxes, path: "/product-items" },
+    { label: "Product", icon: Package, path: "/product" },
+  ],
+};
 
 const Drawer = () => {
   const { user } = useAuthStore();
@@ -37,6 +58,14 @@ const Drawer = () => {
   const activeButtonClass = isLight
     ? "border-amber-300 bg-red-50 text-red-600 shadow-sm shadow-red-900/5"
     : "border-amber-300 bg-red-500/15 text-amber-100 shadow-sm shadow-black/20";
+
+  const menuItems = useMemo(() => {
+    const role = normalizeRole(user?.role);
+    const roleItems =
+      role === "administrator" ? roleMenuItems.admin : roleMenuItems[role] ?? [];
+
+    return roleItems;
+  }, [user?.role]);
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -59,7 +88,7 @@ const Drawer = () => {
   return (
     <aside
       ref={drawerRef}
-      className={`sticky top-23 hidden min-h-[calc(100vh-5.75rem)] shrink-0 border-r shadow-lg transition-all duration-300 ease-in-out md:flex ${
+      className={`sticky top-23 hidden shrink-0 border-r transition-all duration-300 ease-in-out md:flex ${
         isExpanded ? "w-[220px]" : "w-[72px]"
       } ${
         isLight
@@ -129,11 +158,13 @@ const Drawer = () => {
           );
         })}
 
-        <div
-          className={`my-3 h-px w-10 rounded-full ${
-            isLight ? "bg-gray-200" : "bg-gray-700"
-          }`}
-        />
+        {menuItems.length > 3 && (
+          <div
+            className={`my-3 h-px w-10 rounded-full ${
+              isLight ? "bg-gray-200" : "bg-gray-700"
+            }`}
+          />
+        )}
 
         {menuItems.slice(3).map(({ label, icon: Icon, path }) => {
           const isActive = path === location.pathname;
@@ -171,12 +202,17 @@ const Drawer = () => {
 
         <button
           type="button"
-          title="Settings"
+          title="Profile"
+          onClick={() => navigate("/profile")}
           className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-300 ease-in-out hover:cursor-pointer ${
             isExpanded ? "justify-start gap-3 px-3" : "justify-center px-0"
-          } ${drawerButtonClass}`}
+          } ${
+            location.pathname === "/profile"
+              ? activeButtonClass
+              : drawerButtonClass
+          }`}
         >
-          <Settings
+          <CircleUserRound
             size={22}
             strokeWidth={2.25}
             className="shrink-0 transition-transform duration-300 ease-in-out group-hover:scale-105"
@@ -189,7 +225,7 @@ const Drawer = () => {
                 : "max-w-0 -translate-x-2 opacity-0"
             }`}
           >
-            Settings
+            Profile
           </span>
         </button>
       </nav>
