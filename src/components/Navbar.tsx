@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   BarChart3,
+  Boxes,
   BriefcaseBusiness,
   Check,
   ChevronDown,
@@ -45,8 +46,9 @@ const contactLinks = [
 
 const workspaceItems = [
   { label: "Dashboard", icon: LayoutGrid, path: "/" },
+  { label: "Product Items", icon: Boxes, path: "/product-items" },
   { label: "Finance", icon: BriefcaseBusiness },
-  { label: "Products", icon: Package },
+  { label: "Products", icon: Package, path: "/product" },
   { label: "Customers", icon: UsersRound },
   { label: "Analytics", icon: BarChart3 },
   { label: "Settings", icon: Settings },

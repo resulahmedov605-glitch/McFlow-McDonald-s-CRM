@@ -11,6 +11,8 @@ import Drawer from "./components/Drawer";
 import PageLoader from "./components/PageLoader";
 import ErrorPage from "./pages/ErrorPage";
 import Employee from "./pages/Employee";
+import Products from "./pages/Products";
+import ProductItems from "./pages/ProductItems";
 import { useThemeStore } from "./store/useThemeStore";
 
 const RootLayout = () => {
@@ -39,6 +41,9 @@ const routes = createBrowserRouter([
       { path: "/verify", element: <VerifyQR /> },
       { path: "/profile", element: <Profile /> },
       { path: "/employee", element: <Employee /> },
+      { path: "/product-items", element: <ProductItems /> },
+      { path: "/product", element: <Products /> },
+      { path: "/Products", element: <Products /> },
       { index: true, element: <Dashboard /> },
     ],
   },

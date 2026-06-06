@@ -27,7 +27,7 @@ const roleMenuItems: Record<string, MenuItem[]> = {
   admin: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/" },
     { label: "Product Items", icon: Boxes, path: "/product-items" },
-    { label: "Product", icon: Package, path: "/product" },
+    { label: "Products", icon: Package, path: "/Products" },
     { label: "Orders", icon: ShoppingCart, path: "/orders" },
     { label: "Employee", icon: UsersRound, path: "/employee" },
   ],
@@ -38,7 +38,7 @@ const roleMenuItems: Record<string, MenuItem[]> = {
   warehousestaff: [
     { label: "Dashboard", icon: LayoutDashboard, path: "/" },
     { label: "Product Items", icon: Boxes, path: "/product-items" },
-    { label: "Product", icon: Package, path: "/product" },
+    { label: "Products", icon: Package, path: "/product" },
   ],
 };
 
