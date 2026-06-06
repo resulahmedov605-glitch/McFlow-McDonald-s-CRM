@@ -115,13 +115,15 @@ const Employee = () => {
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState("");
   const [photoErrorMessage, setPhotoErrorMessage] = useState("");
   const [isPhotoSaving, setIsPhotoSaving] = useState(false);
+  const [isPhotoDialogClosing, setIsPhotoDialogClosing] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const photoPreviewUrlRef = useRef("");
+  const photoDialogCloseTimerRef = useRef<number | null>(null);
   const isLight = theme === "light";
   const isAdmin = ["admin", "administrator"].includes(
     normalizeRole(currentUser?.role)
   );
-  const isPhotoDialogOpen = Boolean(photoDialogUser);
+  const isPhotoDialogOpen = Boolean(photoDialogUser) && !isPhotoDialogClosing;
   const photoDialogProfilePictureUrl = getProfilePictureUrl(
     photoDialogUser,
     photoDialogUser?.updatedAt
@@ -206,18 +208,40 @@ const Employee = () => {
 
   const openPhotoDialog = useCallback(
     (user: AdminUser) => {
+      if (photoDialogCloseTimerRef.current) {
+        window.clearTimeout(photoDialogCloseTimerRef.current);
+        photoDialogCloseTimerRef.current = null;
+      }
+
+      setIsPhotoDialogClosing(false);
       clearSelectedPhoto();
       setPhotoDialogUser(user);
     },
     [clearSelectedPhoto]
   );
 
+  const finishPhotoDialogClose = useCallback(() => {
+    if (!photoDialogUser) return;
+
+    if (photoDialogCloseTimerRef.current) {
+      window.clearTimeout(photoDialogCloseTimerRef.current);
+    }
+
+    setIsPhotoDialogClosing(true);
+
+    photoDialogCloseTimerRef.current = window.setTimeout(() => {
+      clearSelectedPhoto();
+      setPhotoDialogUser(null);
+      setIsPhotoDialogClosing(false);
+      photoDialogCloseTimerRef.current = null;
+    }, 320);
+  }, [clearSelectedPhoto, photoDialogUser]);
+
   const closePhotoDialog = useCallback(() => {
     if (isPhotoSaving) return;
 
-    clearSelectedPhoto();
-    setPhotoDialogUser(null);
-  }, [clearSelectedPhoto, isPhotoSaving]);
+    finishPhotoDialogClose();
+  }, [finishPhotoDialogClose, isPhotoSaving]);
 
   const handlePhotoSelect = (file?: File) => {
     if (!file) return;
@@ -250,7 +274,7 @@ const Employee = () => {
     try {
       await changeUserProfilePic(photoDialogUser.id, selectedPhoto);
       await loadUsers();
-      closePhotoDialog();
+      finishPhotoDialogClose();
     } catch {
       setPhotoErrorMessage(
         "Profile picture could not be updated. Please try again."
@@ -276,6 +300,10 @@ const Employee = () => {
     return () => {
       if (photoPreviewUrlRef.current) {
         window.URL.revokeObjectURL(photoPreviewUrlRef.current);
+      }
+
+      if (photoDialogCloseTimerRef.current) {
+        window.clearTimeout(photoDialogCloseTimerRef.current);
       }
     };
   }, []);
@@ -516,23 +544,28 @@ const Employee = () => {
                         aria-label={`Change profile picture for ${
                           user.fullName || user.username || "employee"
                         }`}
-                        className={`group relative flex size-11 shrink-0 overflow-hidden rounded-full border-2 bg-red-500 text-sm font-black text-white shadow-sm shadow-red-950/20 ring-2 ring-transparent transition-all duration-200 hover:cursor-pointer hover:scale-105 hover:border-amber-300 hover:ring-amber-300/35 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-transparent active:scale-95 ${
+                        className={`group relative flex size-11 shrink-0 overflow-hidden rounded-full border-2 text-sm font-black text-white shadow-sm ring-2 ring-transparent transition-all duration-200 hover:cursor-pointer hover:scale-105 hover:border-amber-300 hover:ring-amber-300/35 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-transparent active:scale-95 ${
+                          profilePictureUrl
+                            ? "bg-transparent shadow-gray-950/10"
+                            : "bg-red-500 shadow-red-950/20"
+                        } ${
                           isLight ? "border-white" : "border-gray-700"
                         }`}
                       >
-                        <span className="flex size-full items-center justify-center transition-all duration-200 group-hover:scale-105 group-hover:opacity-45 group-hover:blur-[1px]">
-                          {getInitials(user.fullName, user.username)}
-                        </span>
-                        {profilePictureUrl && (
+                        {profilePictureUrl ? (
                           <img
                             key={profilePictureUrl}
                             src={profilePictureUrl}
                             alt={user.fullName || user.username || "Employee"}
-                            className="absolute inset-0 size-full object-cover transition-all duration-200 group-hover:scale-105 group-hover:opacity-45 group-hover:blur-[1px]"
+                            className="size-full object-cover transition-all duration-200 group-hover:scale-105 group-hover:opacity-45 group-hover:blur-[1px]"
                             onError={(event) => {
                               event.currentTarget.style.display = "none";
                             }}
                           />
+                        ) : (
+                          <span className="flex size-full items-center justify-center transition-all duration-200 group-hover:scale-105 group-hover:opacity-45 group-hover:blur-[1px]">
+                            {getInitials(user.fullName, user.username)}
+                          </span>
                         )}
                         <span className="absolute inset-0 flex items-center justify-center bg-gray-950/55 opacity-0 backdrop-blur-[1px] transition-all duration-200 group-hover:opacity-100">
                           <Pencil size={17} strokeWidth={2.7} />
@@ -646,7 +679,11 @@ const Employee = () => {
 
           <div className="mt-7 grid gap-6 sm:grid-cols-[176px_minmax(0,1fr)] sm:items-center">
             <div
-              className={`relative mx-auto flex size-44 overflow-hidden rounded-full border-4 bg-red-500 text-5xl font-black text-white shadow-xl shadow-red-950/20 ring-4 ring-red-500/15 sm:mx-0 ${
+              className={`relative mx-auto flex size-44 overflow-hidden rounded-full border-4 text-5xl font-black text-white shadow-xl ring-4 sm:mx-0 ${
+                photoPreviewUrl || photoDialogProfilePictureUrl
+                  ? "bg-transparent shadow-gray-950/10 ring-gray-500/10"
+                  : "bg-red-500 shadow-red-950/20 ring-red-500/15"
+              } ${
                 isLight ? "border-white" : "border-gray-700"
               }`}
             >
@@ -656,30 +693,27 @@ const Employee = () => {
                   alt="Selected profile preview"
                   className="size-full object-cover"
                 />
+              ) : photoDialogProfilePictureUrl ? (
+                <img
+                  key={photoDialogProfilePictureUrl}
+                  src={photoDialogProfilePictureUrl}
+                  alt={
+                    photoDialogUser?.fullName ||
+                    photoDialogUser?.username ||
+                    "Employee"
+                  }
+                  className="size-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
               ) : (
-                <>
-                  <span className="flex size-full items-center justify-center">
-                    {getInitials(
-                      photoDialogUser?.fullName,
-                      photoDialogUser?.username
-                    )}
-                  </span>
-                  {photoDialogProfilePictureUrl && (
-                    <img
-                      key={photoDialogProfilePictureUrl}
-                      src={photoDialogProfilePictureUrl}
-                      alt={
-                        photoDialogUser?.fullName ||
-                        photoDialogUser?.username ||
-                        "Employee"
-                      }
-                      className="absolute inset-0 size-full object-cover"
-                      onError={(event) => {
-                        event.currentTarget.style.display = "none";
-                      }}
-                    />
+                <span className="flex size-full items-center justify-center">
+                  {getInitials(
+                    photoDialogUser?.fullName,
+                    photoDialogUser?.username
                   )}
-                </>
+                </span>
               )}
             </div>
 

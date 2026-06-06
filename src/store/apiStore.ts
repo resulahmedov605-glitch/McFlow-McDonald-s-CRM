@@ -1,7 +1,7 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { useLoadingStore } from './useLoadingStore'
 
-export const API_BASE_URL = 'http://localhost:8080'
+export const API_BASE_URL = 'https://mcflowapi.rasulahmadov.space'
 const ACCESS_TOKEN_KEY = 'mcflow_access_token'
 const REFRESH_TOKEN_KEY = 'mcflow_refresh_token'
 
