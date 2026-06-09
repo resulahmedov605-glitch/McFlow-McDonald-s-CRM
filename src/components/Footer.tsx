@@ -34,7 +34,7 @@ const Footer = () => {
         <div className="flex flex-col items-center gap-2 sm:flex-row">
           <img
             src="McFlow.svg"
-            alt="McFlow Logo"
+            alt={t('common.logoAlt')}
             className="size-10 rounded-xl"
           />
 

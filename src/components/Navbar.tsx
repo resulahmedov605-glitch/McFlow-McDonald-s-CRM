@@ -45,20 +45,23 @@ const contactLinks = [
 ];
 
 const workspaceItems = [
-  { label: "Dashboard", icon: LayoutGrid, path: "/" },
-  { label: "Product Items", icon: Boxes, path: "/product-items" },
-  { label: "Finance", icon: BriefcaseBusiness },
-  { label: "Products", icon: Package, path: "/product" },
-  { label: "Customers", icon: UsersRound },
-  { label: "Analytics", icon: BarChart3 },
-  { label: "Settings", icon: Settings },
+  { labelKey: "workspace.dashboard", icon: LayoutGrid, path: "/" },
+  { labelKey: "workspace.productItems", icon: Boxes, path: "/product-items" },
+  { labelKey: "workspace.finance", icon: BriefcaseBusiness },
+  { labelKey: "workspace.products", icon: Package, path: "/product" },
+  { labelKey: "workspace.customers", icon: UsersRound },
+  { labelKey: "workspace.analytics", icon: BarChart3 },
+  { labelKey: "workspace.settings", icon: Settings },
 ];
 
 const themeOptions = [
-  { value: "light", label: "Light", icon: SunDim },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
+  { value: "light", labelKey: "themeMenu.light", icon: SunDim },
+  { value: "dark", labelKey: "themeMenu.dark", icon: Moon },
+  { value: "system", labelKey: "themeMenu.system", icon: Monitor },
 ] as const;
+
+const normalizeRole = (role?: string) =>
+  role?.replace(/[\s_-]/g, "").toLowerCase() ?? "";
 
 const Navbar = () => {
   const { user } = useAuthStore();
@@ -80,6 +83,9 @@ const Navbar = () => {
   const navigate = useNavigate();
   const isLight = theme === "light";
   const { t, i18n } = useTranslation();
+  const roleLabel = t(`profile.roles.${normalizeRole(user?.role)}.label`, {
+    defaultValue: user?.role ?? t("common.unknown"),
+  });
   const activeLanguage =
     languageOptions.find((option) => option.code === language) ??
     languageOptions[0];
@@ -172,7 +178,7 @@ const Navbar = () => {
     >
       <img
         src="McFlow.svg"
-        alt="McFlow Logo"
+        alt={t("common.logoAlt")}
         onClick={handleBrandClick}
         className={`h-16 sm:h-full rounded-3xl ml-1 sm:ml-2 shadow-md shadow-amber-500 hover:cursor-pointer transition-all duration-800 ease-out ${
           isLoaded ? "translate-x-0 opacity-100" : "-translate-x-5 opacity-0"
@@ -208,7 +214,7 @@ const Navbar = () => {
               <User size={20} />
             </span>
 
-            <span className="select-none">{user?.role}</span>
+            <span className="select-none">{roleLabel}</span>
           </div>
         )}
 
@@ -276,7 +282,7 @@ const Navbar = () => {
           <button
             type="button"
             onClick={handleThemeToggle}
-            aria-label="Theme menu"
+            aria-label={t("themeMenu.aria")}
             aria-expanded={isThemeOpen}
             className="flex size-12 items-center justify-center rounded-full border-2 border-amber-300 shadow-md touch-manipulation transition-all duration-300 ease-in-out hover:cursor-pointer hover:scale-105 hover:bg-gray-800 hover:shadow-gray-700 active:scale-95 active:bg-gray-800"
           >
@@ -302,7 +308,7 @@ const Navbar = () => {
                 : "pointer-events-none -translate-y-2 opacity-0"
             }`}
           >
-            {themeOptions.map(({ value, label, icon: Icon }) => {
+            {themeOptions.map(({ value, labelKey, icon: Icon }) => {
               const isActive = themePreference === value;
 
               return (
@@ -321,7 +327,7 @@ const Navbar = () => {
                   }`}
                 >
                   <Icon size={16} />
-                  <span className="flex-1">{label}</span>
+                  <span className="flex-1">{t(labelKey)}</span>
                   {isActive && (
                     <Check
                       size={15}
@@ -358,7 +364,7 @@ const Navbar = () => {
             className="flex h-12 w-full items-center justify-center gap-2 rounded-md border-2 border-amber-300 px-3 text-sm font-bold shadow-md touch-manipulation transition-all duration-200 ease-in-out hover:cursor-pointer hover:bg-gray-800 active:scale-95 active:bg-gray-800"
           >
             <User size={18} />
-            <span className="select-none">{user?.role}</span>
+            <span className="select-none">{roleLabel}</span>
           </button>
         )}
 
@@ -462,7 +468,7 @@ const Navbar = () => {
             setIsLanguageOpen(false);
             setIsThemeOpen(false);
           }}
-          aria-label="Open workspace menu"
+          aria-label={t("workspace.open")}
           className="fixed bottom-42 right-3 z-20 flex size-14 items-center justify-center rounded-full border-2 border-amber-300 bg-red-500 text-white shadow-xl shadow-red-950/25 touch-manipulation transition-all duration-300 ease-out hover:cursor-pointer active:scale-95 md:hidden"
         >
           <LayoutGrid size={23} />
@@ -493,20 +499,20 @@ const Navbar = () => {
           >
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-lg font-black">Workspace</p>
+                <p className="text-lg font-black">{t("workspace.title")}</p>
                 <p
                   className={`text-xs font-semibold ${
                     isLight ? "text-gray-500" : "text-gray-300"
                   }`}
                 >
-                  Quick access
+                  {t("workspace.subtitle")}
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setIsWorkspaceOpen(false)}
-                aria-label="Close workspace menu"
+                aria-label={t("workspace.close")}
                 className={`flex size-10 items-center justify-center rounded-full border transition-all duration-200 hover:cursor-pointer active:scale-95 ${
                   isLight
                     ? "border-gray-200 hover:bg-gray-100"
@@ -518,9 +524,9 @@ const Navbar = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              {workspaceItems.map(({ label, icon: Icon, path }) => (
+              {workspaceItems.map(({ labelKey, icon: Icon, path }) => (
                 <button
-                  key={label}
+                  key={labelKey}
                   type="button"
                   onClick={() => handleWorkspaceItemClick(path)}
                   className={`flex h-20 flex-col items-center justify-center gap-2 rounded-lg border text-sm font-bold transition-all duration-200 hover:cursor-pointer active:scale-95 ${
@@ -530,7 +536,7 @@ const Navbar = () => {
                   }`}
                 >
                   <Icon size={22} />
-                  <span>{label}</span>
+                  <span>{t(labelKey)}</span>
                 </button>
               ))}
             </div>

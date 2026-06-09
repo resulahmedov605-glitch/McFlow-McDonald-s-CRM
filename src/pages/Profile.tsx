@@ -12,13 +12,14 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
 import useAuthStore from "../store/authStore";
 import { useThemeStore } from "../store/useThemeStore";
 
 type RoleProfile = {
-  label: string;
-  description: string;
+  labelKey: string;
+  descriptionKey: string;
   icon: LucideIcon;
   accentText: string;
   accentBg: string;
@@ -28,9 +29,8 @@ type RoleProfile = {
 
 const roleProfiles: Record<string, RoleProfile> = {
   admin: {
-    label: "Administrator",
-    description:
-      "Full access to McFlow settings, employees, reports, and operational controls.",
+    labelKey: "profile.roles.admin.label",
+    descriptionKey: "profile.roles.admin.description",
     icon: ShieldCheck,
     accentText: "text-red-600",
     accentBg: "bg-red-500",
@@ -38,9 +38,8 @@ const roleProfiles: Record<string, RoleProfile> = {
     softBg: "bg-red-50",
   },
   administrator: {
-    label: "Administrator",
-    description:
-      "Full access to McFlow settings, employees, reports, and operational controls.",
+    labelKey: "profile.roles.administrator.label",
+    descriptionKey: "profile.roles.administrator.description",
     icon: ShieldCheck,
     accentText: "text-red-600",
     accentBg: "bg-red-500",
@@ -48,9 +47,8 @@ const roleProfiles: Record<string, RoleProfile> = {
     softBg: "bg-red-50",
   },
   cashier: {
-    label: "Cashier",
-    description:
-      "Handles sales workflows, customer payments, and daily checkout activity.",
+    labelKey: "profile.roles.cashier.label",
+    descriptionKey: "profile.roles.cashier.description",
     icon: ShoppingCart,
     accentText: "text-emerald-700",
     accentBg: "bg-emerald-500",
@@ -58,9 +56,8 @@ const roleProfiles: Record<string, RoleProfile> = {
     softBg: "bg-emerald-50",
   },
   warehousestaff: {
-    label: "Warehouse Staff",
-    description:
-      "Manages stock movement, warehouse updates, and product availability tasks.",
+    labelKey: "profile.roles.warehousestaff.label",
+    descriptionKey: "profile.roles.warehousestaff.description",
     icon: HardHat,
     accentText: "text-blue-700",
     accentBg: "bg-blue-500",
@@ -68,9 +65,8 @@ const roleProfiles: Record<string, RoleProfile> = {
     softBg: "bg-blue-50",
   },
   untrusted: {
-    label: "Untrusted",
-    description:
-      "Limited access account. An administrator should review this user's permissions.",
+    labelKey: "profile.roles.untrusted.label",
+    descriptionKey: "profile.roles.untrusted.description",
     icon: ShieldAlert,
     accentText: "text-amber-700",
     accentBg: "bg-amber-500",
@@ -82,14 +78,18 @@ const roleProfiles: Record<string, RoleProfile> = {
 const normalizeRole = (role?: string) =>
   role?.replace(/[\s_-]/g, "").toLowerCase() ?? "";
 
-const formatDate = (value?: string) => {
-  if (!value) return "Not available";
+const formatDate = (
+  value: string | undefined,
+  locale: string,
+  fallback: string
+) => {
+  if (!value) return fallback;
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "Not available";
+  if (Number.isNaN(date.getTime())) return fallback;
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -113,11 +113,15 @@ const Profile = () => {
   const { user, setUser } = useAuthStore();
   const theme = useThemeStore((state) => state.theme);
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
   const isLight = theme === "light";
   const roleProfile =
     roleProfiles[normalizeRole(user?.role)] ?? roleProfiles.untrusted;
   const RoleIcon = roleProfile.icon;
+  const locale = i18n.resolvedLanguage ?? i18n.language;
+  const roleLabel = t(roleProfile.labelKey);
+  const roleDescription = t(roleProfile.descriptionKey);
   const roleTooltipId = "profile-role-tooltip";
 
   const handleLogout = () => {
@@ -137,36 +141,36 @@ const Profile = () => {
 
   const identityDetails = [
     {
-      label: "Username",
+      label: t("profile.username"),
       value: user?.username ?? "-",
       icon: UserRound,
     },
     {
-      label: "Email address",
+      label: t("profile.emailAddress"),
       value: user?.email ?? "-",
       icon: Mail,
     },
     {
-      label: "Role",
-      value: roleProfile.label,
+      label: t("profile.role"),
+      value: roleLabel,
       icon: RoleIcon,
     },
   ];
 
   const activityDetails = [
     {
-      label: "Account created",
-      value: formatDate(user?.createdAt),
+      label: t("profile.accountCreated"),
+      value: formatDate(user?.createdAt, locale, t("common.notAvailable")),
       icon: CalendarDays,
     },
     {
-      label: "Last updated",
-      value: formatDate(user?.updatedAt),
+      label: t("profile.lastUpdated"),
+      value: formatDate(user?.updatedAt, locale, t("common.notAvailable")),
       icon: RefreshCcw,
     },
     {
-      label: "Last login",
-      value: formatDate(user?.loginedAt),
+      label: t("profile.lastLogin"),
+      value: formatDate(user?.loginedAt, locale, t("common.notAvailable")),
       icon: Clock3,
     },
   ];
@@ -240,7 +244,7 @@ const Profile = () => {
           <p
             className={`text-xs font-black uppercase tracking-[0.2em] ${roleProfile.accentText}`}
           >
-            Profile
+            {t("profile.eyebrow")}
           </p>
 
           <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
@@ -253,14 +257,14 @@ const Profile = () => {
 
               <div className="min-w-0">
                 <h1 className="break-words text-3xl font-black sm:text-4xl">
-                  {user?.fullName ?? "Profile"}
+                  {user?.fullName ?? t("profile.fallbackTitle")}
                 </h1>
                 <p
                   className={`mt-1 break-words text-sm font-semibold sm:text-base ${
                     isLight ? "text-gray-500" : "text-gray-400"
                   }`}
                 >
-                  {user?.email ?? "Account details"}
+                  {user?.email ?? t("profile.fallbackSubtitle")}
                 </p>
               </div>
             </div>
@@ -268,7 +272,10 @@ const Profile = () => {
             <div
               tabIndex={0}
               aria-describedby={roleTooltipId}
-              aria-label={`${roleProfile.label} role. ${roleProfile.description}`}
+              aria-label={t("profile.roleAria", {
+                role: roleLabel,
+                description: roleDescription,
+              })}
               className={`group relative inline-flex self-start overflow-visible select-none rounded-xl border shadow-sm shadow-gray-950/5 outline-none transition-transform duration-200 focus-visible:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-offset-2 lg:self-center ${
                 isLight
                   ? "focus-visible:ring-red-300 focus-visible:ring-offset-gray-50"
@@ -284,12 +291,12 @@ const Profile = () => {
                 className={`flex flex-col justify-center rounded-r-[11px] px-3 py-1.5 ${roleProfile.softBg}`}
               >
                 <span className="text-[10px] font-black uppercase tracking-[0.18em] text-gray-500">
-                  Access role
+                  {t("profile.accessRole")}
                 </span>
                 <span
                   className={`text-sm font-black leading-tight ${roleProfile.accentText}`}
                 >
-                  {roleProfile.label}
+                  {roleLabel}
                 </span>
               </span>
 
@@ -309,7 +316,7 @@ const Profile = () => {
                       : "border-gray-700 bg-gray-800"
                   }`}
                 />
-                <span className="relative block">{roleProfile.description}</span>
+                <span className="relative block">{roleDescription}</span>
               </span>
             </div>
             
@@ -317,8 +324,16 @@ const Profile = () => {
         </header>
 
         <div className="mt-8 grid gap-9 lg:grid-cols-2 lg:gap-16">
-          {detailSection("Identity", "Account details", identityDetails)}
-          {detailSection("Activity", "Account timeline", activityDetails)}
+          {detailSection(
+            t("profile.identity"),
+            t("profile.identitySubtitle"),
+            identityDetails
+          )}
+          {detailSection(
+            t("profile.activity"),
+            t("profile.activitySubtitle"),
+            activityDetails
+          )}
         </div>
 
         <div
@@ -327,13 +342,13 @@ const Profile = () => {
           }`}
         >
           <div>
-            <p className="text-sm font-black">Session</p>
+            <p className="text-sm font-black">{t("profile.session")}</p>
             <p
               className={`mt-1 text-sm font-semibold ${
                 isLight ? "text-gray-500" : "text-gray-400"
               }`}
             >
-              Sign out from this device when you are done.
+              {t("profile.sessionHelp")}
             </p>
           </div>
 
@@ -346,7 +361,7 @@ const Profile = () => {
             <span className="flex size-7 items-center justify-center rounded-lg bg-red-500 text-white transition-all duration-200 group-hover:bg-white group-hover:text-red-500">
               <LogOut size={16} />
             </span>
-            Logout
+            {t("profile.logout")}
           </button>
         </div>
       </section>
@@ -383,14 +398,14 @@ const Profile = () => {
 
             <div className="min-w-0">
               <h2 id="logout-dialog-title" className="text-xl font-black">
-                Sign out?
+                {t("profile.signOutTitle")}
               </h2>
               <p
                 className={`mt-1 text-sm font-semibold ${
                   isLight ? "text-gray-500" : "text-gray-400"
                 }`}
               >
-                Are you sure you want to leave this McFlow session?
+                {t("profile.signOutMessage")}
               </p>
             </div>
           </div>
@@ -405,14 +420,14 @@ const Profile = () => {
                   : "border-gray-700 bg-gray-900 hover:bg-gray-700"
               }`}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
               onClick={handleLogout}
               className="h-11 rounded-xl bg-red-500 px-4 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-98"
             >
-              Yes, logout
+              {t("profile.confirmLogout")}
             </button>
           </div>
         </section>

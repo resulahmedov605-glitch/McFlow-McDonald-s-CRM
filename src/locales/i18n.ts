@@ -1,6 +1,7 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { useLanguageStore } from '../store/useLanguageStore'
+import { uiTranslations } from './uiTranslations'
 
 const initialLanguage = useLanguageStore.getState().language
 
@@ -78,6 +79,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Məxfilik',
           built: 'Restoran əməliyyatları üçün hazırlanıb.',
         },
+        ...uiTranslations.az,
       },
     },
     tr: {
@@ -152,6 +154,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Gizlilik',
           built: 'Restoran operasyonları için geliştirildi.',
         },
+        ...uiTranslations.tr,
       },
     },
     en: {
@@ -226,6 +229,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Privacy',
           built: 'Built for restaurant operations.',
         },
+        ...uiTranslations.en,
       },
     },
     de: {
@@ -300,6 +304,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Datenschutz',
           built: 'Entwickelt für Restaurantabläufe.',
         },
+        ...uiTranslations.de,
       },
     },
     ru: {
@@ -374,6 +379,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Конфиденциальность',
           built: 'Создано для ресторанных операций.',
         },
+        ...uiTranslations.ru,
       },
     },
     fr: {
@@ -449,6 +455,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Confidentialité',
           built: 'Conçu pour les opérations de restaurant.',
         },
+        ...uiTranslations.fr,
       },
     },
     es: {
@@ -523,6 +530,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Privacidad',
           built: 'Creado para operaciones de restaurante.',
         },
+        ...uiTranslations.es,
       },
     },
     it: {
@@ -597,6 +605,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Privacy',
           built: 'Creato per le operazioni di ristorazione.',
         },
+        ...uiTranslations.it,
       },
     },
     pt: {
@@ -671,6 +680,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Privacidade',
           built: 'Criado para operações de restaurante.',
         },
+        ...uiTranslations.pt,
       },
     },
     nl: {
@@ -745,6 +755,7 @@ i18n.use(initReactI18next).init({
           privacy: 'Privacy',
           built: 'Gebouwd voor restaurantactiviteiten.',
         },
+        ...uiTranslations.nl,
       },
     },
   },

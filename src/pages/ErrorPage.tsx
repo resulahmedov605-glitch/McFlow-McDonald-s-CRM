@@ -4,19 +4,23 @@ import {
   useNavigate,
   useRouteError,
 } from "react-router";
+import { useTranslation } from "react-i18next";
 import { useThemeStore } from "../store/useThemeStore";
 
 const ErrorPage = () => {
   const navigate = useNavigate();
   const error = useRouteError();
   const theme = useThemeStore((state) => state.theme);
+  const { t } = useTranslation();
   const isLight = theme === "light";
   const status = isRouteErrorResponse(error) ? error.status : 404;
   const isNotFound = status === 404;
-  const title = isNotFound ? "Page not found" : "Something went wrong";
+  const title = isNotFound
+    ? t("errorPage.pageNotFound")
+    : t("errorPage.somethingWentWrong");
   const message = isNotFound
-    ? "This McFlow station does not exist yet."
-    : "The workspace could not be served right now.";
+    ? t("errorPage.notFoundMessage")
+    : t("errorPage.genericMessage");
 
   return (
     <main
@@ -76,7 +80,7 @@ const ErrorPage = () => {
             className="flex h-12 items-center justify-center gap-2 rounded-lg border border-amber-300 bg-red-500 px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-98"
           >
             <Home size={18} />
-            Dashboard
+            {t("errorPage.dashboard")}
           </button>
 
           <button
@@ -89,7 +93,7 @@ const ErrorPage = () => {
             }`}
           >
             <ArrowLeft size={18} />
-            Go back
+            {t("errorPage.goBack")}
           </button>
 
           {!isNotFound && (
@@ -103,7 +107,7 @@ const ErrorPage = () => {
               }`}
             >
               <RefreshCcw size={18} />
-              Retry
+              {t("errorPage.retry")}
             </button>
           )}
         </div>

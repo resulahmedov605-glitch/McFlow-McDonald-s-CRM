@@ -1,32 +1,38 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLoadingStore } from "../store/useLoadingStore";
 import { useThemeStore } from "../store/useThemeStore";
 
 const PageLoader = () => {
   const isLoading = useLoadingStore((state) => state.isLoading);
   const theme = useThemeStore((state) => state.theme);
+  const { t } = useTranslation();
   const [shouldRender, setShouldRender] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const isLight = theme === "light";
 
   useEffect(() => {
     if (isLoading) {
-      setShouldRender(true);
-
       const frame = window.requestAnimationFrame(() => {
+        setShouldRender(true);
         setIsVisible(true);
       });
 
       return () => window.cancelAnimationFrame(frame);
     }
 
-    setIsVisible(false);
+    const frame = window.requestAnimationFrame(() => {
+      setIsVisible(false);
+    });
 
     const timer = window.setTimeout(() => {
       setShouldRender(false);
     }, 250);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
   }, [isLoading]);
 
   if (!shouldRender) {
@@ -36,13 +42,13 @@ const PageLoader = () => {
   return (
     <div
       role="status"
-      aria-label="Loading"
-      className={`pointer-events-none fixed inset-x-0 top-23 z-50 transition-all duration-300 ease-out ${
-        isVisible ? "opacity-100" : "opacity-0"
+      aria-label={t("common.loading")}
+      className={`fixed inset-0 z-50 transition-all duration-300 ease-out ${
+        isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
       <div
-        className={`h-1 overflow-hidden ${
+        className={`absolute inset-x-0 top-23 z-10 h-1 overflow-hidden ${
           isLight ? "bg-gray-100" : "bg-gray-900"
         }`}
       >
@@ -50,7 +56,7 @@ const PageLoader = () => {
       </div>
 
       <div
-        className={`fixed inset-x-0 bottom-0 top-24 flex items-center justify-center backdrop-blur-[2px] transition-colors duration-300 ${
+        className={`absolute inset-0 flex items-center justify-center backdrop-blur-[2px] transition-colors duration-300 ${
           isLight ? "bg-white/45" : "bg-gray-950/30"
         }`}
       >
@@ -84,7 +90,7 @@ const PageLoader = () => {
               isLight ? "text-gray-500" : "text-gray-300"
             }`}
           >
-            Preparing your workspace
+            {t("common.loading")}
           </p>
 
           <div

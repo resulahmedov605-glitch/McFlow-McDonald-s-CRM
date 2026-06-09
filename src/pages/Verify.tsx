@@ -223,7 +223,7 @@ const VerifyQR = () => {
         <div className="mb-8 flex items-center gap-3">
           <img
             src="McFlow.svg"
-            alt="McFlow Logo"
+            alt={t("common.logoAlt")}
             className="size-14 rounded-2xl"
           />
 

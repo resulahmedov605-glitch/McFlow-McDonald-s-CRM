@@ -11,11 +11,12 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../store/authStore";
 import { useThemeStore } from "../store/useThemeStore";
 
 type MenuItem = {
-  label: string;
+  labelKey: string;
   icon: LucideIcon;
   path: string;
 };
@@ -25,26 +26,27 @@ const normalizeRole = (role?: string) =>
 
 const roleMenuItems: Record<string, MenuItem[]> = {
   admin: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-    { label: "Product Items", icon: Boxes, path: "/product-items" },
-    { label: "Products", icon: Package, path: "/Products" },
-    { label: "Orders", icon: ShoppingCart, path: "/orders" },
-    { label: "Employee", icon: UsersRound, path: "/employee" },
+    { labelKey: "drawer.dashboard", icon: LayoutDashboard, path: "/" },
+    { labelKey: "drawer.productItems", icon: Boxes, path: "/product-items" },
+    { labelKey: "drawer.products", icon: Package, path: "/Products" },
+    { labelKey: "drawer.orders", icon: ShoppingCart, path: "/orders" },
+    { labelKey: "drawer.employee", icon: UsersRound, path: "/employee" },
   ],
   cashier: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-    { label: "Orders", icon: ShoppingCart, path: "/orders" },
+    { labelKey: "drawer.dashboard", icon: LayoutDashboard, path: "/" },
+    { labelKey: "drawer.orders", icon: ShoppingCart, path: "/orders" },
   ],
   warehousestaff: [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/" },
-    { label: "Product Items", icon: Boxes, path: "/product-items" },
-    { label: "Products", icon: Package, path: "/product" },
+    { labelKey: "drawer.dashboard", icon: LayoutDashboard, path: "/" },
+    { labelKey: "drawer.productItems", icon: Boxes, path: "/product-items" },
+    { labelKey: "drawer.products", icon: Package, path: "/product" },
   ],
 };
 
 const Drawer = () => {
   const { user } = useAuthStore();
   const theme = useThemeStore((state) => state.theme);
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const drawerRef = useRef<HTMLElement>(null);
@@ -100,7 +102,7 @@ const Drawer = () => {
         <button
           type="button"
           onClick={() => setIsExpanded((expanded) => !expanded)}
-          aria-label={isExpanded ? "Collapse drawer" : "Expand drawer"}
+          aria-label={isExpanded ? t("drawer.collapse") : t("drawer.expand")}
           className={`mb-2 flex h-10 w-full items-center rounded-lg text-sm font-bold transition-all duration-300 ease-in-out hover:cursor-pointer ${
             isExpanded ? "justify-between gap-3 px-3" : "justify-center px-0"
           } ${
@@ -116,7 +118,7 @@ const Drawer = () => {
                 : "max-w-0 -translate-x-2 opacity-0"
             }`}
           >
-            Menu
+            {t("drawer.menu")}
           </span>
 
           {isExpanded ? (
@@ -126,12 +128,13 @@ const Drawer = () => {
           )}
         </button>
 
-        {menuItems.slice(0, 3).map(({ label, icon: Icon, path }) => {
+        {menuItems.slice(0, 3).map(({ labelKey, icon: Icon, path }) => {
           const isActive = path === location.pathname;
+          const label = t(labelKey);
 
           return (
             <button
-              key={label}
+              key={labelKey}
               type="button"
               title={label}
               onClick={() => path && navigate(path)}
@@ -166,12 +169,13 @@ const Drawer = () => {
           />
         )}
 
-        {menuItems.slice(3).map(({ label, icon: Icon, path }) => {
+        {menuItems.slice(3).map(({ labelKey, icon: Icon, path }) => {
           const isActive = path === location.pathname;
+          const label = t(labelKey);
 
           return (
             <button
-              key={label}
+              key={labelKey}
               type="button"
               title={label}
               onClick={() => path && navigate(path)}
@@ -202,7 +206,7 @@ const Drawer = () => {
 
         <button
           type="button"
-          title="Profile"
+          title={t("drawer.profile")}
           onClick={() => navigate("/profile")}
           className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-300 ease-in-out hover:cursor-pointer ${
             isExpanded ? "justify-start gap-3 px-3" : "justify-center px-0"
@@ -225,7 +229,7 @@ const Drawer = () => {
                 : "max-w-0 -translate-x-2 opacity-0"
             }`}
           >
-            Profile
+            {t("drawer.profile")}
           </span>
         </button>
       </nav>

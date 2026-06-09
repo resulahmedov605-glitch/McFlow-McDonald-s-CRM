@@ -1,7 +1,9 @@
-const Dashboard = () => {
-  return (
-    <div>Dashboard</div>
-  )
-}
+import { useTranslation } from "react-i18next";
 
-export default Dashboard
+const Dashboard = () => {
+  const { t } = useTranslation();
+
+  return <div>{t("dashboard.title")}</div>;
+};
+
+export default Dashboard;

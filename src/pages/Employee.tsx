@@ -20,6 +20,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import {
   changeUserProfilePic,
@@ -33,13 +34,20 @@ import { useThemeStore } from "../store/useThemeStore";
 const normalizeRole = (role?: string) =>
   role?.replace(/[\s_-]/g, "").toLowerCase() ?? "";
 
-const formatRole = (role?: string | null) => {
-  if (!role) return "Unknown";
+const formatRole = (
+  role: string | null | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string
+) => {
+  if (!role) return t("common.unknown");
 
-  return role
+  const fallback = role
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/[_-]/g, " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  return t(`profile.roles.${normalizeRole(role)}.label`, {
+    defaultValue: fallback,
+  });
 };
 
 type RoleStyle = {
@@ -76,14 +84,18 @@ const getRoleStyle = (role?: string | null): RoleStyle =>
     className: "border-gray-300 bg-gray-50 text-gray-600",
   };
 
-const formatDate = (value?: string | null) => {
-  if (!value) return "Not available";
+const formatDate = (
+  value: string | null | undefined,
+  locale: string,
+  fallback: string
+) => {
+  if (!value) return fallback;
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "Not available";
+  if (Number.isNaN(date.getTime())) return fallback;
 
-  return new Intl.DateTimeFormat("en", {
+  return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -103,6 +115,7 @@ const getInitials = (fullName?: string | null, username?: string | null) => {
 const Employee = () => {
   const currentUser = useAuthStore((state) => state.user);
   const theme = useThemeStore((state) => state.theme);
+  const { t, i18n } = useTranslation();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -120,6 +133,7 @@ const Employee = () => {
   const photoPreviewUrlRef = useRef("");
   const photoDialogCloseTimerRef = useRef<number | null>(null);
   const isLight = theme === "light";
+  const locale = i18n.resolvedLanguage ?? i18n.language;
   const isAdmin = ["admin", "administrator"].includes(
     normalizeRole(currentUser?.role)
   );
@@ -137,7 +151,7 @@ const Employee = () => {
       const response = await getUsers();
       setUsers(response);
     } catch {
-      setErrorMessage("Employees could not be loaded. Please try again.");
+      setErrorMessage("employee.loadError");
     } finally {
       setIsLoading(false);
     }
@@ -154,7 +168,7 @@ const Employee = () => {
       })
       .catch(() => {
         if (isActive) {
-          setErrorMessage("Employees could not be loaded. Please try again.");
+          setErrorMessage("employee.loadError");
         }
       })
       .finally(() => {
@@ -247,7 +261,7 @@ const Employee = () => {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      setPhotoErrorMessage("Please choose a valid image file.");
+      setPhotoErrorMessage("employee.photoDialog.invalidImage");
       return;
     }
 
@@ -264,7 +278,7 @@ const Employee = () => {
 
   const handlePhotoSave = async () => {
     if (!photoDialogUser || !selectedPhoto) {
-      setPhotoErrorMessage("Please choose a photo first.");
+      setPhotoErrorMessage("employee.photoDialog.chooseFirst");
       return;
     }
 
@@ -276,9 +290,7 @@ const Employee = () => {
       await loadUsers();
       finishPhotoDialogClose();
     } catch {
-      setPhotoErrorMessage(
-        "Profile picture could not be updated. Please try again."
-      );
+      setPhotoErrorMessage("employee.photoDialog.updateError");
     } finally {
       setIsPhotoSaving(false);
     }
@@ -341,13 +353,15 @@ const Employee = () => {
           <div className="mx-auto flex size-16 items-center justify-center rounded-2xl bg-red-500 text-white shadow-lg shadow-red-950/20">
             <LockKeyhole size={28} />
           </div>
-          <h1 className="mt-5 text-2xl font-black">Admin access required</h1>
+          <h1 className="mt-5 text-2xl font-black">
+            {t("employee.adminRequiredTitle")}
+          </h1>
           <p
             className={`mt-2 text-sm font-semibold ${
               isLight ? "text-gray-500" : "text-gray-300"
             }`}
           >
-            Only administrators can view the employee list.
+            {t("employee.adminRequiredMessage")}
           </p>
         </section>
       </main>
@@ -369,9 +383,9 @@ const Employee = () => {
               </span>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-red-500">
-                  Administration
+                  {t("employee.eyebrow")}
                 </p>
-                <h1 className="text-3xl font-black">Employees</h1>
+                <h1 className="text-3xl font-black">{t("employee.title")}</h1>
               </div>
             </div>
             <p
@@ -379,7 +393,7 @@ const Employee = () => {
                 isLight ? "text-gray-500" : "text-gray-400"
               }`}
             >
-              View all users registered in the McFlow workspace.
+              {t("employee.subtitle")}
             </p>
           </div>
 
@@ -397,7 +411,7 @@ const Employee = () => {
                   isLight ? "text-gray-500" : "text-gray-400"
                 }`}
               >
-                Total users
+                {t("employee.totalUsers")}
               </p>
               <p className="text-xl font-black">{users.length}</p>
             </div>
@@ -432,7 +446,7 @@ const Employee = () => {
                   type="text"
                   value={search}
                   onChange={(event) => handleSearchChange(event.target.value)}
-                  placeholder="Search employees"
+                  placeholder={t("employee.searchPlaceholder")}
                   className={`h-11 w-full rounded-lg border pl-10 pr-12 text-sm font-semibold outline-none transition-all duration-200 ${
                     isLight
                       ? "border-gray-200 bg-gray-50 placeholder:text-gray-400 focus:border-amber-400"
@@ -442,7 +456,7 @@ const Employee = () => {
                 <button
                   type="button"
                   onClick={handleSearchClear}
-                  aria-label="Clear employee search"
+                  aria-label={t("employee.clearSearch")}
                   className={`absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border transition-all duration-200 ease-out ${
                     search
                       ? "pointer-events-auto scale-100 opacity-100 hover:cursor-pointer hover:scale-105 active:scale-95"
@@ -465,8 +479,8 @@ const Employee = () => {
                 } ${isLight ? "text-gray-500" : "text-gray-400"}`}
               >
                 {trimmedSearch.length === 1
-                  ? "Type one more character to search"
-                  : "Searching..."}
+                  ? t("common.typeMoreToSearch")
+                  : t("common.searching")}
               </p>
             </div>
 
@@ -475,7 +489,10 @@ const Employee = () => {
                 isLight ? "text-gray-500" : "text-gray-400"
               }`}
             >
-              Showing {filteredUsers.length} of {users.length}
+              {t("common.showingOf", {
+                shown: filteredUsers.length,
+                total: users.length,
+              })}
             </p>
           </div>
 
@@ -486,19 +503,19 @@ const Employee = () => {
                   isLight ? "text-gray-500" : "text-gray-400"
                 }`}
               >
-                Loading employees...
+                {t("employee.loading")}
               </p>
             </div>
           ) : errorMessage ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-6 text-center">
-              <p className="font-bold text-red-500">{errorMessage}</p>
+              <p className="font-bold text-red-500">{t(errorMessage)}</p>
               <button
                 type="button"
                 onClick={() => void loadUsers()}
                 className="mt-4 flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-98"
               >
                 <RefreshCcw size={17} />
-                Retry
+                {t("common.retry")}
               </button>
             </div>
           ) : filteredUsers.length === 0 ? (
@@ -507,13 +524,13 @@ const Employee = () => {
                 size={36}
                 className={isLight ? "text-gray-300" : "text-gray-600"}
               />
-              <p className="mt-3 font-bold">No employees found</p>
+              <p className="mt-3 font-bold">{t("employee.emptyTitle")}</p>
               <p
                 className={`mt-1 text-sm font-semibold ${
                   isLight ? "text-gray-500" : "text-gray-400"
                 }`}
               >
-                Try a different search term.
+                {t("employee.emptyMessage")}
               </p>
             </div>
           ) : (
@@ -541,9 +558,12 @@ const Employee = () => {
                       <button
                         type="button"
                         onClick={() => openPhotoDialog(user)}
-                        aria-label={`Change profile picture for ${
-                          user.fullName || user.username || "employee"
-                        }`}
+                        aria-label={t("employee.changePhotoAria", {
+                          name:
+                            user.fullName ||
+                            user.username ||
+                            t("common.employeeAlt"),
+                        })}
                         className={`group relative flex size-11 shrink-0 overflow-hidden rounded-full border-2 text-sm font-black text-white shadow-sm ring-2 ring-transparent transition-all duration-200 hover:cursor-pointer hover:scale-105 hover:border-amber-300 hover:ring-amber-300/35 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-transparent active:scale-95 ${
                           profilePictureUrl
                             ? "bg-transparent shadow-gray-950/10"
@@ -556,7 +576,11 @@ const Employee = () => {
                           <img
                             key={profilePictureUrl}
                             src={profilePictureUrl}
-                            alt={user.fullName || user.username || "Employee"}
+                            alt={
+                              user.fullName ||
+                              user.username ||
+                              t("common.employeeAlt")
+                            }
                             className="size-full object-cover transition-all duration-200 group-hover:scale-105 group-hover:opacity-45 group-hover:blur-[1px]"
                             onError={(event) => {
                               event.currentTarget.style.display = "none";
@@ -573,14 +597,14 @@ const Employee = () => {
                       </button>
                       <div className="min-w-0">
                         <h2 className="truncate font-black">
-                          {user.fullName || "Unnamed user"}
+                          {user.fullName || t("common.unnamedUser")}
                         </h2>
                         <p
                           className={`truncate text-sm font-semibold ${
                             isLight ? "text-gray-500" : "text-gray-400"
                           }`}
                         >
-                          @{user.username || "unknown"}
+                          @{user.username || t("common.unknown")}
                         </p>
                       </div>
                     </div>
@@ -600,7 +624,13 @@ const Employee = () => {
                         }`}
                       >
                         <CalendarDays size={15} className="shrink-0" />
-                        Created {formatDate(user.createdAt)}
+                        {t("employee.created", {
+                          date: formatDate(
+                            user.createdAt,
+                            locale,
+                            t("common.notAvailable")
+                          ),
+                        })}
                       </p>
                     </div>
 
@@ -609,7 +639,7 @@ const Employee = () => {
                         className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black ${roleStyle.className}`}
                       >
                         <RoleIcon size={14} />
-                        {formatRole(user.role)}
+                        {formatRole(user.role, t)}
                       </span>
                       <span
                         className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
@@ -617,7 +647,11 @@ const Employee = () => {
                         }`}
                       >
                         <Clock3 size={14} />
-                        {formatDate(user.loginedAt)}
+                        {formatDate(
+                          user.loginedAt,
+                          locale,
+                          t("common.notAvailable")
+                        )}
                       </span>
                     </div>
                   </article>
@@ -663,7 +697,7 @@ const Employee = () => {
                 id="profile-photo-dialog-title"
                 className="text-2xl font-black"
               >
-                Change profile picture
+                {t("employee.photoDialog.title")}
               </h2>
               <p
                 className={`mt-1 truncate text-sm font-semibold ${
@@ -672,7 +706,7 @@ const Employee = () => {
               >
                 {photoDialogUser?.fullName ||
                   photoDialogUser?.username ||
-                  "Employee"}
+                  t("common.employeeAlt")}
               </p>
             </div>
           </div>
@@ -690,7 +724,7 @@ const Employee = () => {
               {photoPreviewUrl ? (
                 <img
                   src={photoPreviewUrl}
-                  alt="Selected profile preview"
+                  alt={t("common.selectedProfilePreviewAlt")}
                   className="size-full object-cover"
                 />
               ) : photoDialogProfilePictureUrl ? (
@@ -700,7 +734,7 @@ const Employee = () => {
                   alt={
                     photoDialogUser?.fullName ||
                     photoDialogUser?.username ||
-                    "Employee"
+                    t("common.employeeAlt")
                   }
                   className="size-full object-cover"
                   onError={(event) => {
@@ -729,7 +763,7 @@ const Employee = () => {
                   <ImagePlus size={20} />
                 </span>
                 <div className="min-w-0">
-                  <p className="font-black">Upload new photo</p>
+                  <p className="font-black">{t("employee.photoDialog.uploadTitle")}</p>
                   <p
                     className={`mt-1 text-sm font-semibold ${
                       isLight ? "text-gray-500" : "text-gray-400"
@@ -737,7 +771,7 @@ const Employee = () => {
                   >
                     {selectedPhoto
                       ? selectedPhoto.name
-                      : "JPG, PNG, or WebP. Recommended size is 512x512."}
+                      : t("employee.photoDialog.uploadHelp")}
                   </p>
                 </div>
               </div>
@@ -764,7 +798,7 @@ const Employee = () => {
                   }`}
                 >
                   <ImagePlus size={17} />
-                  Choose photo
+                  {t("employee.photoDialog.choosePhoto")}
                 </button>
                 <button
                   type="button"
@@ -781,7 +815,7 @@ const Employee = () => {
                   }`}
                 >
                   <Trash2 size={17} />
-                  Remove
+                  {t("employee.photoDialog.remove")}
                 </button>
               </div>
 
@@ -794,11 +828,13 @@ const Employee = () => {
                     : "text-gray-400"
                 }`}
               >
-                {photoErrorMessage ||
+                {photoErrorMessage
+                  ? t(photoErrorMessage)
+                  :
                   (isPhotoSaving
-                    ? "Uploading profile picture..."
+                    ? t("employee.photoDialog.uploading")
                     : selectedPhoto
-                    ? "Ready to save."
+                    ? t("employee.photoDialog.readyToSave")
                     : "")}
               </p>
             </div>
@@ -823,7 +859,7 @@ const Employee = () => {
                   : "border-gray-700 bg-gray-900 hover:bg-gray-700"
               }`}
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="button"
@@ -835,7 +871,9 @@ const Employee = () => {
                   : "bg-red-500 hover:cursor-pointer hover:bg-red-600"
               }`}
             >
-              {isPhotoSaving ? "Saving..." : "Save changes"}
+              {isPhotoSaving
+                ? t("employee.photoDialog.saving")
+                : t("employee.photoDialog.saveChanges")}
             </button>
           </div>
         </section>
