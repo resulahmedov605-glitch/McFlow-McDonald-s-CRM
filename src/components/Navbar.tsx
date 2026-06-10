@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  BarChart3,
   Boxes,
   BriefcaseBusiness,
   Check,
@@ -14,7 +13,6 @@ import {
   Settings,
   SunDim,
   User,
-  UsersRound,
   X,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
