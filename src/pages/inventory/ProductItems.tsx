@@ -20,8 +20,8 @@ import {
   getProductItems,
   type ProductItem,
   type UnitType,
-} from "../lib/services/productItemsService";
-import { useThemeStore } from "../store/useThemeStore";
+} from "../../lib/services/productItemsService";
+import { useThemeStore } from "../../store/useThemeStore";
 
 const formatCurrency = (value: number | null | undefined, locale: string) =>
   new Intl.NumberFormat(locale, {

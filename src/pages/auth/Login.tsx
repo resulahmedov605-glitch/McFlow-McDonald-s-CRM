@@ -3,8 +3,8 @@ import { useForm } from "@tanstack/react-form";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import toast, { Toaster } from "react-hot-toast";
-import { useThemeStore } from "../store/useThemeStore";
-import { login } from "../lib/services/authService";
+import { useThemeStore } from "../../store/useThemeStore";
+import { login } from "../../lib/services/authService";
 import { useNavigate } from "react-router";
 
 const Login = () => {

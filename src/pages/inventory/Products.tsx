@@ -26,13 +26,13 @@ import {
   getProducts,
   uploadProductImage,
   type Product,
-} from "../lib/services/productService";
+} from "../../lib/services/productService";
 import {
   getProductItems,
   type ProductItem,
-} from "../lib/services/productItemsService";
-import { API_BASE_URL } from "../store/apiStore";
-import { useThemeStore } from "../store/useThemeStore";
+} from "../../lib/services/productItemsService";
+import { API_BASE_URL } from "../../store/apiStore";
+import { useThemeStore } from "../../store/useThemeStore";
 
 const formatCurrency = (value: number | null | undefined, locale: string) =>
   new Intl.NumberFormat(locale, {

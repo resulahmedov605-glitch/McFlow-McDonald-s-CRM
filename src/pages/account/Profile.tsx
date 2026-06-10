@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router";
-import useAuthStore from "../store/authStore";
-import { useThemeStore } from "../store/useThemeStore";
+import useAuthStore from "../../store/authStore";
+import { useThemeStore } from "../../store/useThemeStore";
 
 type RoleProfile = {
   labelKey: string;

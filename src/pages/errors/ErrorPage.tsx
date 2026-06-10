@@ -5,7 +5,7 @@ import {
   useRouteError,
 } from "react-router";
 import { useTranslation } from "react-i18next";
-import { useThemeStore } from "../store/useThemeStore";
+import { useThemeStore } from "../../store/useThemeStore";
 
 const ErrorPage = () => {
   const navigate = useNavigate();

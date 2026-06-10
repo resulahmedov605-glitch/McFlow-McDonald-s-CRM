@@ -9,9 +9,9 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import toast, { Toaster } from "react-hot-toast";
-import { useThemeStore } from "../store/useThemeStore";
+import { useThemeStore } from "../../store/useThemeStore";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
-import { verify } from "../lib/services/authService";
+import { verify } from "../../lib/services/authService";
 
 const OTP_LENGTH = 6;
 

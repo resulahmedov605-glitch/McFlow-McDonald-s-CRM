@@ -1,18 +1,19 @@
 import { useEffect } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router";
-import Login from "./pages/Login";
-import VerifyQR from "./pages/Verify";
+import Login from "./pages/auth/Login";
+import VerifyQR from "./pages/auth/Verify";
 import Dashboard from "./pages/dashboard/Dashboard";
 import AuthWall from "./components/AuthWall";
-import Profile from "./pages/Profile";
+import Profile from "./pages/account/Profile";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Drawer from "./components/Drawer";
 import PageLoader from "./components/PageLoader";
-import ErrorPage from "./pages/ErrorPage";
-import Employee from "./pages/Employee";
-import Products from "./pages/Products";
-import ProductItems from "./pages/ProductItems";
+import ErrorPage from "./pages/errors/ErrorPage";
+import Employee from "./pages/employees/Employee";
+import Products from "./pages/inventory/Products";
+import ProductItems from "./pages/inventory/ProductItems";
+import Orders from "./pages/orders/Orders";
 import { useThemeStore } from "./store/useThemeStore";
 
 const RootLayout = () => {
@@ -44,6 +45,7 @@ const routes = createBrowserRouter([
       { path: "/product-items", element: <ProductItems /> },
       { path: "/product", element: <Products /> },
       { path: "/Products", element: <Products /> },
+      { path: "/orders", element: <Orders /> },
       { index: true, element: <Dashboard /> },
     ],
   },

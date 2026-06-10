@@ -26,10 +26,10 @@ import {
   changeUserProfilePic,
   getUsers,
   type AdminUser,
-} from "../lib/services/adminService";
-import { getProfilePictureUrl } from "../lib/profilePicture";
-import useAuthStore from "../store/authStore";
-import { useThemeStore } from "../store/useThemeStore";
+} from "../../lib/services/adminService";
+import { getProfilePictureUrl } from "../../lib/profilePicture";
+import useAuthStore from "../../store/authStore";
+import { useThemeStore } from "../../store/useThemeStore";
 
 const normalizeRole = (role?: string) =>
   role?.replace(/[\s_-]/g, "").toLowerCase() ?? "";
