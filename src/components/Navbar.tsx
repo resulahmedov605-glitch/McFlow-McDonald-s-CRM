@@ -47,11 +47,9 @@ const contactLinks = [
 const workspaceItems = [
   { labelKey: "workspace.dashboard", icon: LayoutGrid, path: "/" },
   { labelKey: "workspace.productItems", icon: Boxes, path: "/product-items" },
-  { labelKey: "workspace.finance", icon: BriefcaseBusiness },
   { labelKey: "workspace.products", icon: Package, path: "/product" },
-  { labelKey: "workspace.customers", icon: UsersRound },
-  { labelKey: "workspace.analytics", icon: BarChart3 },
-  { labelKey: "workspace.settings", icon: Settings },
+  { labelKey: "workspace.employees", icon: BriefcaseBusiness, path: "/employee" },
+  { labelKey: "workspace.profile", icon: Settings, path: "/profile" },
 ];
 
 const themeOptions = [
@@ -351,7 +349,7 @@ const Navbar = () => {
       </div>
 
       <div
-        className={`absolute left-0 top-23 z-10 flex w-full flex-col gap-2 bg-red-500 px-4 py-3 text-white font-medium shadow-lg transition-all duration-300 ease-in-out md:hidden ${
+        className={`absolute left-0 top-20 z-10 flex w-full flex-col gap-2 bg-red-500 px-4 py-3 text-white font-medium shadow-lg transition-all duration-300 ease-in-out md:hidden ${
           isMenuOpen
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none -translate-y-3 opacity-0"
@@ -469,7 +467,7 @@ const Navbar = () => {
             setIsThemeOpen(false);
           }}
           aria-label={t("workspace.open")}
-          className="fixed bottom-42 right-3 z-20 flex size-14 items-center justify-center rounded-full border-2 border-amber-300 bg-red-500 text-white shadow-xl shadow-red-950/25 touch-manipulation transition-all duration-300 ease-out hover:cursor-pointer active:scale-95 md:hidden"
+          className="fixed bottom-24 right-3 z-20 flex size-14 items-center justify-center rounded-full border-2 border-amber-300 bg-red-500 text-white shadow-xl shadow-red-950/25 touch-manipulation transition-all duration-300 ease-out hover:cursor-pointer active:scale-95 md:hidden"
         >
           <LayoutGrid size={23} />
         </button>
