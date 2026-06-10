@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import Login from "./pages/Login";
 import VerifyQR from "./pages/Verify";
-import Dashboard from "./pages/Dashboard";
+import Dashboard from "./pages/dashboard/Dashboard";
 import AuthWall from "./components/AuthWall";
 import Profile from "./pages/Profile";
 import Navbar from "./components/Navbar";
