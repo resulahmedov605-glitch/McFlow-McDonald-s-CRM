@@ -821,7 +821,7 @@ const Employee = () => {
                         {formatRole(user.role, t)}
                       </span>
                       <span
-                        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold sm:rounded-none sm:border-0 sm:p-0 ${
+                        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 ${
                           isLight
                             ? "border-gray-200 bg-gray-50 text-gray-500"
                             : "border-gray-700 bg-gray-900 text-gray-400"
