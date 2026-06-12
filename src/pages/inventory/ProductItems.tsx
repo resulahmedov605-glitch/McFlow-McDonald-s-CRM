@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Boxes,
+  ChevronDown,
   CircleDollarSign,
   LoaderCircle,
   Minus,
@@ -9,11 +10,13 @@ import {
   RefreshCcw,
   Ruler,
   Search,
+  SlidersHorizontal,
   Warehouse,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 
 import {
   createProductItem,
@@ -49,7 +52,7 @@ const getStockStyle = (stock: number, isLight: boolean) => {
       : "border-red-400/60 bg-red-500/15 text-red-200";
   }
 
-  if (stock <= 10) {
+  if (stock <= 20) {
     return isLight
       ? "border-amber-300 bg-amber-50 text-amber-700"
       : "border-amber-300/70 bg-amber-500/15 text-amber-100";
@@ -61,6 +64,10 @@ const getStockStyle = (stock: number, isLight: boolean) => {
 };
 
 type NumericCreateField = "pricePerUnit" | "stock";
+type StockFilter = "all" | "out" | "low" | "in";
+type UnitFilter = "all" | UnitType;
+
+const stockFilterOptions: StockFilter[] = ["all", "out", "low", "in"];
 
 const unitOptions: UnitType[] = [
   "Grams",
@@ -78,12 +85,22 @@ const defaultCreateForm = {
   stock: "",
 };
 
+const matchesStockFilter = (stock: number, filter: StockFilter) => {
+  if (filter === "out") return stock <= 0;
+  if (filter === "low") return stock > 0 && stock <= 20;
+  if (filter === "in") return stock > 20;
+
+  return true;
+};
+
 const ProductItems = () => {
   const theme = useThemeStore((state) => state.theme);
   const { t, i18n } = useTranslation();
   const [productItems, setProductItems] = useState<ProductItem[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [stockFilter, setStockFilter] = useState<StockFilter>("all");
+  const [unitFilter, setUnitFilter] = useState<UnitFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -105,6 +122,9 @@ const ProductItems = () => {
       setProductItems(response);
     } catch {
       setErrorMessage("productItems.loadError");
+      toast.error(t("productItems.loadError"), {
+        id: "product-items-load-error",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -120,6 +140,9 @@ const ProductItems = () => {
       .catch(() => {
         if (isActive) {
           setErrorMessage("productItems.loadError");
+          toast.error(t("productItems.loadError"), {
+            id: "product-items-load-error",
+          });
         }
       })
       .finally(() => {
@@ -129,7 +152,7 @@ const ProductItems = () => {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const query = search.trim();
@@ -236,6 +259,11 @@ const ProductItems = () => {
     handleCreateFormChange(field, String(nextValue));
   };
 
+  const showCreateError = (messageKey: string) => {
+    setCreateErrorMessage(messageKey);
+    toast.error(t(messageKey));
+  };
+
   const handleCreateProductItem = async (
     event: React.FormEvent<HTMLFormElement>
   ) => {
@@ -247,22 +275,22 @@ const ProductItems = () => {
     const stock = Number(createForm.stock);
 
     if (!name) {
-      setCreateErrorMessage("productItems.create.nameRequired");
+      showCreateError("productItems.create.nameRequired");
       return;
     }
 
     if (!unitOptions.includes(unit)) {
-      setCreateErrorMessage("productItems.create.invalidUnit");
+      showCreateError("productItems.create.invalidUnit");
       return;
     }
 
     if (!Number.isFinite(pricePerUnit) || pricePerUnit < 0) {
-      setCreateErrorMessage("productItems.create.priceInvalid");
+      showCreateError("productItems.create.priceInvalid");
       return;
     }
 
     if (!Number.isFinite(stock) || stock < 0) {
-      setCreateErrorMessage("productItems.create.stockInvalid");
+      showCreateError("productItems.create.stockInvalid");
       return;
     }
 
@@ -279,9 +307,11 @@ const ProductItems = () => {
 
       const refreshedProductItems = await getProductItems();
       setProductItems(refreshedProductItems);
+      toast.success(t("productItems.create.created"));
       finishCreateDialogClose();
     } catch {
       setCreateErrorMessage("productItems.create.createError");
+      toast.error(t("productItems.create.createError"));
     } finally {
       setIsCreating(false);
     }
@@ -290,14 +320,21 @@ const ProductItems = () => {
   const filteredProductItems = useMemo(() => {
     const query = debouncedSearch.toLowerCase();
 
-    if (!query) return productItems;
+    return productItems.filter((item) => {
+      const matchesSearch =
+        !query ||
+        [item.name, item.unit].some((value) =>
+          value?.toLowerCase().includes(query)
+        );
+      const matchesUnit = unitFilter === "all" || item.unit === unitFilter;
 
-    return productItems.filter((item) =>
-      [item.name, item.unit].some((value) =>
-        value?.toLowerCase().includes(query)
-      )
-    );
-  }, [debouncedSearch, productItems]);
+      return (
+        matchesSearch &&
+        matchesUnit &&
+        matchesStockFilter(item.stock, stockFilter)
+      );
+    });
+  }, [debouncedSearch, productItems, stockFilter, unitFilter]);
 
   const totalStock = productItems.reduce(
     (total, item) => total + (item.stock || 0),
@@ -313,7 +350,9 @@ const ProductItems = () => {
         0
       ) / productItems.length
     : 0;
-  const lowStockCount = productItems.filter((item) => item.stock <= 10).length;
+  const lowStockCount = filteredProductItems.filter(
+    (item) => item.stock <= 20
+  ).length;
   const trimmedSearch = search.trim();
   const isSearchPending =
     trimmedSearch.length >= 2 && trimmedSearch !== debouncedSearch;
@@ -329,72 +368,79 @@ const ProductItems = () => {
     placeholder: string;
     icon: LucideIcon;
     inputStep?: string;
-  }) => (
-    <label
-      className={`rounded-xl border p-3 transition-colors duration-200 ${
-        isLight
-          ? "border-gray-200 bg-gray-50"
-          : "border-gray-700 bg-gray-900"
-      }`}
-    >
-      <span
-        className={`flex items-center gap-2 text-xs font-black uppercase tracking-wide ${
-          isLight ? "text-gray-500" : "text-gray-400"
-        }`}
-      >
-        <Icon size={15} className="text-red-500" />
-        {label}
-      </span>
+  }) => {
+    const currentValue = Number(createForm[field]);
+    const isDecreaseDisabled =
+      isCreating || !Number.isFinite(currentValue) || currentValue <= 0;
 
+    return (
       <div
-        className={`mt-3 flex h-12 overflow-hidden rounded-xl border ${
+        className={`rounded-xl border p-3 transition-colors duration-200 ${
           isLight
-            ? "border-gray-200 bg-white"
-            : "border-gray-700 bg-gray-800"
+            ? "border-gray-200 bg-gray-50"
+            : "border-gray-700 bg-gray-900"
         }`}
       >
-        <button
-          type="button"
-          onClick={() => adjustCreateNumber(field, -1)}
-          disabled={isCreating}
-          aria-label={t("common.decrease", { label })}
-          className={`flex w-12 shrink-0 items-center justify-center border-r transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
-            isLight
-              ? "border-gray-200 text-gray-600 hover:bg-red-50 hover:text-red-600"
-              : "border-gray-700 text-gray-300 hover:bg-red-500/15 hover:text-red-200"
+        <span
+          className={`flex items-center gap-2 text-xs font-black uppercase tracking-wide ${
+            isLight ? "text-gray-500" : "text-gray-400"
           }`}
         >
-          <Minus size={18} strokeWidth={2.7} />
-        </button>
+          <Icon size={15} className="text-red-500" />
+          {label}
+        </span>
 
-        <input
-          type="number"
-          value={createForm[field]}
-          onChange={(event) =>
-            handleCreateFormChange(field, event.target.value)
-          }
-          min="0"
-          step={inputStep}
-          placeholder={placeholder}
-          className={`h-full min-w-0 flex-1 bg-transparent px-2 text-center text-base font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+        <div
+          className={`mt-3 flex h-12 overflow-hidden rounded-xl border ${
             isLight
-              ? "placeholder:text-gray-300"
-              : "placeholder:text-gray-600"
+              ? "border-gray-200 bg-white"
+              : "border-gray-700 bg-gray-800"
           }`}
-        />
-
-        <button
-          type="button"
-          onClick={() => adjustCreateNumber(field, 1)}
-          disabled={isCreating}
-          aria-label={t("common.increase", { label })}
-          className="flex w-12 shrink-0 items-center justify-center bg-red-500 text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
         >
-          <Plus size={18} strokeWidth={2.7} />
-        </button>
+          <button
+            type="button"
+            onClick={() => adjustCreateNumber(field, -1)}
+            disabled={isDecreaseDisabled}
+            aria-label={t("common.decrease", { label })}
+            className={`flex w-12 shrink-0 items-center justify-center border-r transition-all duration-200 enabled:hover:cursor-pointer enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${
+              isLight
+                ? "border-gray-200 text-gray-600 enabled:hover:bg-red-50 enabled:hover:text-red-600"
+                : "border-gray-700 text-gray-300 enabled:hover:bg-red-500/15 enabled:hover:text-red-200"
+            }`}
+          >
+            <Minus size={18} strokeWidth={2.7} />
+          </button>
+
+          <input
+            type="number"
+            value={createForm[field]}
+            onChange={(event) =>
+              handleCreateFormChange(field, event.target.value)
+            }
+            min="0"
+            step={inputStep}
+            placeholder={placeholder}
+            aria-label={label}
+            className={`h-full min-w-0 flex-1 bg-transparent px-2 text-center text-base font-black outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+              isLight
+                ? "placeholder:text-gray-300"
+                : "placeholder:text-gray-600"
+            }`}
+          />
+
+          <button
+            type="button"
+            onClick={() => adjustCreateNumber(field, 1)}
+            disabled={isCreating}
+            aria-label={t("common.increase", { label })}
+            className="flex w-12 shrink-0 items-center justify-center bg-red-500 text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <Plus size={18} strokeWidth={2.7} />
+          </button>
+        </div>
       </div>
-    </label>
-  );
+    );
+  };
 
   return (
     <main
@@ -528,49 +574,143 @@ const ProductItems = () => {
           }`}
         >
           <div
-            className={`flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between ${
+            className={`flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-start lg:justify-between ${
               isLight ? "border-gray-200" : "border-gray-700"
             }`}
           >
-            <div className="w-full lg:max-w-sm">
-              <div className="relative">
-                <Search
-                  size={18}
-                  className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
-                    search
-                      ? "text-red-500"
-                      : isLight
-                      ? "text-gray-400"
-                      : "text-gray-500"
-                  }`}
-                />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(event) => handleSearchChange(event.target.value)}
-                  placeholder={t("productItems.searchPlaceholder")}
-                  className={`h-11 w-full rounded-lg border pl-10 pr-12 text-sm font-semibold outline-none transition-all duration-200 ${
-                    isLight
-                      ? "border-gray-200 bg-gray-50 placeholder:text-gray-400 focus:border-amber-400"
-                      : "border-gray-600 bg-gray-900 placeholder:text-gray-500 focus:border-amber-400"
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={handleSearchClear}
-                  aria-label={t("productItems.clearSearch")}
-                  className={`absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border transition-all duration-200 ease-out ${
-                    search
-                      ? "pointer-events-auto scale-100 opacity-100 hover:cursor-pointer hover:scale-105 active:scale-95"
-                      : "pointer-events-none scale-75 opacity-0"
-                  } ${
-                    isLight
-                      ? "border-gray-300 bg-white text-gray-600 shadow-sm hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-                      : "border-gray-600 bg-gray-800 text-gray-300 shadow-sm hover:border-red-400 hover:bg-red-500/15 hover:text-red-300"
-                  }`}
-                >
-                  <X size={15} strokeWidth={2.5} />
-                </button>
+            <div className="w-full lg:max-w-3xl">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative min-w-0 flex-1">
+                  <Search
+                    size={18}
+                    className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
+                      search
+                        ? "text-red-500"
+                        : isLight
+                        ? "text-gray-400"
+                        : "text-gray-500"
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(event) => handleSearchChange(event.target.value)}
+                    placeholder={t("productItems.searchPlaceholder")}
+                    className={`h-11 w-full rounded-lg border pl-10 pr-12 text-sm font-semibold outline-none transition-all duration-200 ${
+                      isLight
+                        ? "border-gray-200 bg-gray-50 placeholder:text-gray-400 focus:border-amber-400"
+                        : "border-gray-600 bg-gray-900 placeholder:text-gray-500 focus:border-amber-400"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSearchClear}
+                    aria-label={t("productItems.clearSearch")}
+                    className={`absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border transition-all duration-200 ease-out ${
+                      search
+                        ? "pointer-events-auto scale-100 opacity-100 hover:cursor-pointer hover:scale-105 active:scale-95"
+                        : "pointer-events-none scale-75 opacity-0"
+                    } ${
+                      isLight
+                        ? "border-gray-300 bg-white text-gray-600 shadow-sm hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+                        : "border-gray-600 bg-gray-800 text-gray-300 shadow-sm hover:border-red-400 hover:bg-red-500/15 hover:text-red-300"
+                    }`}
+                  >
+                    <X size={15} strokeWidth={2.5} />
+                  </button>
+                </div>
+
+                <div className="relative sm:w-44">
+                  <SlidersHorizontal
+                    size={17}
+                    className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
+                      stockFilter === "all"
+                        ? isLight
+                          ? "text-gray-400"
+                          : "text-gray-500"
+                        : "text-red-500"
+                    }`}
+                  />
+                  <select
+                    value={stockFilter}
+                    onChange={(event) =>
+                      setStockFilter(event.target.value as StockFilter)
+                    }
+                    aria-label={t("productItems.stockFilterAria", {
+                      defaultValue: "Filter by stock",
+                    })}
+                    className={`h-11 w-full appearance-none rounded-lg border pl-10 pr-10 text-sm font-black outline-none transition-all duration-200 hover:cursor-pointer focus:border-amber-400 ${
+                      isLight
+                        ? "border-gray-200 bg-gray-50 text-gray-700"
+                        : "border-gray-600 bg-gray-900 text-gray-100"
+                    }`}
+                  >
+                    {stockFilterOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {t(`productItems.filters.${option}`, {
+                          defaultValue:
+                            option === "out"
+                              ? "Out of stock"
+                              : option === "low"
+                              ? "Low stock"
+                              : option === "in"
+                              ? "In stock"
+                              : "All stock",
+                        })}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={17}
+                    className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${
+                      isLight ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  />
+                </div>
+
+                <div className="relative sm:w-48">
+                  <Ruler
+                    size={17}
+                    className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
+                      unitFilter === "all"
+                        ? isLight
+                          ? "text-gray-400"
+                          : "text-gray-500"
+                        : "text-red-500"
+                    }`}
+                  />
+                  <select
+                    value={unitFilter}
+                    onChange={(event) =>
+                      setUnitFilter(event.target.value as UnitFilter)
+                    }
+                    aria-label={t("productItems.unitFilterAria", {
+                      defaultValue: "Filter by unit",
+                    })}
+                    className={`h-11 w-full appearance-none rounded-lg border pl-10 pr-10 text-sm font-black outline-none transition-all duration-200 hover:cursor-pointer focus:border-amber-400 ${
+                      isLight
+                        ? "border-gray-200 bg-gray-50 text-gray-700"
+                        : "border-gray-600 bg-gray-900 text-gray-100"
+                    }`}
+                  >
+                    <option value="all">
+                      {t("productItems.filters.allUnits", {
+                        defaultValue: "All units",
+                      })}
+                    </option>
+                    {unitOptions.map((unit) => (
+                      <option key={unit} value={unit}>
+                        {t(`units.${unit}`, { defaultValue: unit })}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={17}
+                    className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${
+                      isLight ? "text-gray-400" : "text-gray-500"
+                    }`}
+                  />
+                </div>
               </div>
 
               <p
@@ -586,9 +726,9 @@ const ProductItems = () => {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
               <div
-                className={`flex min-h-11 flex-wrap items-center gap-3 rounded-xl border px-3 text-sm font-semibold ${
+                className={`flex h-11 items-center gap-3 rounded-xl border px-3 text-sm font-semibold ${
                   isLight
                     ? "border-gray-200 bg-gray-50 text-gray-500"
                     : "border-gray-700 bg-gray-900 text-gray-400"
@@ -607,7 +747,7 @@ const ProductItems = () => {
                 type="button"
                 onClick={openCreateDialog}
                 aria-label={t("productItems.createAria")}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95"
+                className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95"
               >
                 <Plus size={21} strokeWidth={2.7} />
                 <span>{t("productItems.newItem")}</span>
@@ -661,73 +801,111 @@ const ProductItems = () => {
                 return (
                   <article
                     key={item.id}
-                    className={`relative grid gap-4 overflow-hidden rounded-xl border p-4 pl-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 lg:grid-cols-[minmax(0,1.5fr)_minmax(160px,0.75fr)_minmax(160px,0.75fr)_minmax(160px,0.75fr)] lg:items-center ${
+                    className={`relative overflow-hidden rounded-xl border p-4 pl-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 lg:grid lg:grid-cols-[minmax(0,1.5fr)_minmax(160px,0.75fr)_minmax(160px,0.75fr)_minmax(160px,0.75fr)] lg:items-center ${
                       isLight
                         ? "border-gray-200 bg-gray-50 hover:border-amber-300 hover:bg-white hover:shadow-gray-900/10"
                         : "border-gray-700 bg-gray-900 hover:border-amber-300 hover:bg-gray-800 hover:shadow-black/30"
                     }`}
                   >
                     <span className="absolute inset-y-0 left-0 w-1 bg-red-500" />
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white shadow-sm shadow-red-950/15">
-                        <Boxes size={21} />
+                    <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 lg:block">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white shadow-sm shadow-red-950/15">
+                          <Boxes size={21} />
+                        </span>
+                        <div className="min-w-0">
+                          <h2 className="truncate font-black">
+                            {item.name || t("common.unnamedItem")}
+                          </h2>
+                          <p
+                            className={`mt-1 hidden items-center gap-1.5 text-sm font-semibold lg:inline-flex ${
+                              isLight ? "text-gray-500" : "text-gray-400"
+                            }`}
+                          >
+                            <Ruler size={15} className="text-red-500" />
+                            {item.unit
+                              ? t(`units.${item.unit}`, {
+                                  defaultValue: item.unit,
+                                })
+                              : t("productItems.noUnit")}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-black lg:hidden ${
+                          isLight
+                            ? "border-amber-300 bg-amber-50 text-amber-800"
+                            : "border-amber-300/50 bg-amber-400/15 text-amber-100"
+                        }`}
+                      >
+                        <Ruler size={15} />
+                        {item.unit
+                          ? t(`units.${item.unit}`, {
+                              defaultValue: item.unit,
+                            })
+                          : t("productItems.noUnit")}
                       </span>
-                      <div className="min-w-0">
-                        <h2 className="truncate font-black">
-                          {item.name || t("common.unnamedItem")}
-                        </h2>
+                    </div>
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-3 lg:contents">
+                      <div
+                        className={`rounded-lg border px-3 py-2 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 ${
+                          isLight
+                            ? "border-gray-200 bg-white"
+                            : "border-gray-700 bg-gray-800"
+                        }`}
+                      >
                         <p
-                          className={`mt-1 inline-flex items-center gap-1.5 text-sm font-semibold ${
+                          className={`text-xs font-black uppercase tracking-wide ${
                             isLight ? "text-gray-500" : "text-gray-400"
                           }`}
                         >
-                          <Ruler size={15} className="text-red-500" />
-                          {item.unit
-                            ? t(`units.${item.unit}`, { defaultValue: item.unit })
-                            : t("productItems.noUnit")}
+                          {t("productItems.pricePerUnit")}
+                        </p>
+                        <p className="mt-1 text-base font-black lg:text-lg">
+                          {formatUnitCurrency(item.pricePerUnit, locale)}
                         </p>
                       </div>
-                    </div>
 
-                    <div>
-                      <p
-                        className={`text-xs font-black uppercase tracking-wide ${
-                          isLight ? "text-gray-500" : "text-gray-400"
+                      <div
+                        className={`rounded-lg border px-3 py-2 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 ${
+                          isLight
+                            ? "border-gray-200 bg-white"
+                            : "border-gray-700 bg-gray-800"
                         }`}
                       >
-                        {t("productItems.pricePerUnit")}
-                      </p>
-                      <p className="mt-1 text-lg font-black">
-                        {formatUnitCurrency(item.pricePerUnit, locale)}
-                      </p>
-                    </div>
+                        <p
+                          className={`text-xs font-black uppercase tracking-wide ${
+                            isLight ? "text-gray-500" : "text-gray-400"
+                          }`}
+                        >
+                          {t("productItems.stock")}
+                        </p>
+                        <span
+                          className={`mt-1 inline-flex rounded-full border px-3 py-1 text-sm font-black ${stockStyle}`}
+                        >
+                          {formatNumber(item.stock, locale)}
+                        </span>
+                      </div>
 
-                    <div>
-                      <p
-                        className={`text-xs font-black uppercase tracking-wide ${
-                          isLight ? "text-gray-500" : "text-gray-400"
+                      <div
+                        className={`rounded-lg border px-3 py-2 sm:text-right lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 ${
+                          isLight
+                            ? "border-gray-200 bg-white"
+                            : "border-gray-700 bg-gray-800"
                         }`}
                       >
-                        {t("productItems.stock")}
-                      </p>
-                      <span
-                        className={`mt-1 inline-flex rounded-full border px-3 py-1 text-sm font-black ${stockStyle}`}
-                      >
-                        {formatNumber(item.stock, locale)}
-                      </span>
-                    </div>
-
-                    <div className="lg:text-right">
-                      <p
-                        className={`text-xs font-black uppercase tracking-wide ${
-                          isLight ? "text-gray-500" : "text-gray-400"
-                        }`}
-                      >
-                        {t("productItems.totalValue")}
-                      </p>
-                      <p className="mt-1 text-lg font-black">
-                        {formatCurrency(rowValue, locale)}
-                      </p>
+                        <p
+                          className={`text-xs font-black uppercase tracking-wide ${
+                            isLight ? "text-gray-500" : "text-gray-400"
+                          }`}
+                        >
+                          {t("productItems.totalValue")}
+                        </p>
+                        <p className="mt-1 text-base font-black lg:text-lg">
+                          {formatCurrency(rowValue, locale)}
+                        </p>
+                      </div>
                     </div>
                   </article>
                 );

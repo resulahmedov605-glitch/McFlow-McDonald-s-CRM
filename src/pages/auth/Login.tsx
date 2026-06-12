@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { useThemeStore } from "../../store/useThemeStore";
 import { login } from "../../lib/services/authService";
 import { useNavigate } from "react-router";
@@ -81,31 +81,6 @@ const Login = () => {
         isLight ? "bg-white" : "bg-gray-700"
       }`}
     >
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 2600,
-          style: {
-            borderRadius: "25px",
-            border: isLight ? "2px solid #e5e7eb" : "2px solid #4b5563",
-            background: isLight ? "#ffffff" : "#1f2937",
-            color: isLight ? "#111827" : "#f9fafb",
-          },
-          success: {
-            iconTheme: {
-              primary: "#22c55e",
-              secondary: "#f0fdf4",
-            },
-          },
-          error: {
-            iconTheme: {
-              primary: "#ef4444",
-              secondary: "#fff7ed",
-            },
-          },
-        }}
-      />
-
       <div
         className={`w-full max-w-xl rounded-2xl border p-7 shadow-xl transition-colors duration-300 sm:p-10 ${
           isLight

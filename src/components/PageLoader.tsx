@@ -43,12 +43,12 @@ const PageLoader = () => {
     <div
       role="status"
       aria-label={t("common.loading")}
-      className={`fixed inset-0 z-50 transition-all duration-300 ease-out ${
+      className={`fixed inset-0 z-50 hidden transition-all duration-300 ease-out md:block ${
         isVisible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
       <div
-        className={`absolute inset-x-0 top-23 z-10 h-1 overflow-hidden ${
+        className={`absolute inset-x-0 top-23 z-10 hidden h-1 overflow-hidden md:block ${
           isLight ? "bg-gray-100" : "bg-gray-900"
         }`}
       >

@@ -1,1 +1,13 @@
-Bunu et: Mobile - da navbardakilara click etmek olsun, yeni click edende scale ile falan deyisin.
+bunlari et: orders listine bax, bezi seyler deyise yaxsi olar meselen, statuslari. ++++
+
+new order ve yanidaki digerleri ile eyni hundurlukde olsun. ++++
+
+product-da her hansisa birinden ele etmek olsunki birbasa order yaransin. ++++
+
+toast elave et olmayanlara. ++++
+
+delete metodu yarat ve istifade etki product sile bilek.
+
+dashboard et.
+
+responsivliyede baxarsan. ++++

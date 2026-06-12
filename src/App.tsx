@@ -9,6 +9,7 @@ import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 import Drawer from "./components/Drawer";
 import PageLoader from "./components/PageLoader";
+import ToastHost from "./components/ToastHost";
 import ErrorPage from "./pages/errors/ErrorPage";
 import Employee from "./pages/employees/Employee";
 import Products from "./pages/inventory/Products";
@@ -69,7 +70,12 @@ const App = () => {
       themeMedia.removeEventListener("change", handleSystemThemeChange);
   }, [syncSystemTheme]);
 
-  return <RouterProvider router={routes} />;
+  return (
+    <>
+      <ToastHost />
+      <RouterProvider router={routes} />
+    </>
+  );
 };
 
 export default App;

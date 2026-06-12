@@ -1,11 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   Boxes,
+  BriefcaseBusiness,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
+  Code2,
   LayoutDashboard,
   Package,
+  Send,
   ShoppingCart,
   UsersRound,
   type LucideIcon,
@@ -43,6 +52,19 @@ const roleMenuItems: Record<string, MenuItem[]> = {
   ],
 };
 
+const creatorLinks = [
+  {
+    title: "GitHub",
+    href: "https://github.com/resulahmedov605-glitch",
+    icon: Code2,
+  },
+  {
+    title: "LinkedIn",
+    href: "https://www.linkedin.com/in/resul-ahmedov-342933348/",
+    icon: BriefcaseBusiness,
+  },
+];
+
 const Drawer = () => {
   const { user } = useAuthStore();
   const theme = useThemeStore((state) => state.theme);
@@ -51,6 +73,7 @@ const Drawer = () => {
   const navigate = useNavigate();
   const drawerRef = useRef<HTMLElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isContactOpen, setIsContactOpen] = useState(false);
   const isLight = theme === "light";
   const isPublicRoute =
     location.pathname === "/login" || location.pathname.includes("/verify");
@@ -69,12 +92,38 @@ const Drawer = () => {
     return roleItems;
   }, [user?.role]);
 
+  const closeExpandedDrawer = () => {
+    setIsExpanded(false);
+    setIsContactOpen(false);
+  };
+
+  const toggleDrawer = () => {
+    if (isExpanded) {
+      closeExpandedDrawer();
+      return;
+    }
+
+    setIsExpanded(true);
+  };
+
+  const handleDrawerBlankClick = (event: ReactMouseEvent<HTMLElement>) => {
+    if (
+      !isExpanded ||
+      !isContactOpen ||
+      event.target !== event.currentTarget
+    ) {
+      return;
+    }
+
+    setIsContactOpen(false);
+  };
+
   useEffect(() => {
     if (!isExpanded) return;
 
     const closeDrawer = (event: MouseEvent) => {
       if (!drawerRef.current?.contains(event.target as Node)) {
-        setIsExpanded(false);
+        closeExpandedDrawer();
       }
     };
 
@@ -87,10 +136,21 @@ const Drawer = () => {
     return null;
   }
 
+  const handleContactToggle = () => {
+    if (!isExpanded) {
+      setIsExpanded(true);
+      setIsContactOpen(true);
+      return;
+    }
+
+    setIsContactOpen((open) => !open);
+  };
+
   return (
     <aside
       ref={drawerRef}
-      className={`sticky top-23 hidden shrink-0 border-r transition-all duration-300 ease-in-out md:flex ${
+      onClick={handleDrawerBlankClick}
+      className={`sticky top-23 hidden shrink-0 border-r transition-all duration-[350ms] ease-in-out md:flex ${
         isExpanded ? "w-[220px]" : "w-[72px]"
       } ${
         isLight
@@ -98,12 +158,15 @@ const Drawer = () => {
           : "border-gray-700 bg-gray-800 text-gray-300 shadow-black/20"
       }`}
     >
-      <nav className="flex h-full w-full flex-col items-center gap-2 px-3 py-6">
+      <nav
+        onClick={handleDrawerBlankClick}
+        className="flex h-full w-full flex-col items-center gap-2 px-3 py-6"
+      >
         <button
           type="button"
-          onClick={() => setIsExpanded((expanded) => !expanded)}
+          onClick={toggleDrawer}
           aria-label={isExpanded ? t("drawer.collapse") : t("drawer.expand")}
-          className={`mb-2 flex h-10 w-full items-center rounded-lg text-sm font-bold transition-all duration-300 ease-in-out hover:cursor-pointer ${
+          className={`mb-2 flex h-10 w-full items-center rounded-lg text-sm font-bold transition-all duration-[350ms] ease-in-out hover:cursor-pointer ${
             isExpanded ? "justify-between gap-3 px-3" : "justify-center px-0"
           } ${
             isLight
@@ -112,7 +175,7 @@ const Drawer = () => {
           }`}
         >
           <span
-            className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-300 ease-in-out ${
+            className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-[350ms] ease-in-out ${
               isExpanded
                 ? "max-w-24 translate-x-0 opacity-100"
                 : "max-w-0 -translate-x-2 opacity-0"
@@ -138,18 +201,18 @@ const Drawer = () => {
               type="button"
               title={label}
               onClick={() => path && navigate(path)}
-              className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-300 ease-in-out hover:cursor-pointer ${
+              className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-[350ms] ease-in-out hover:cursor-pointer ${
                 isExpanded ? "justify-start gap-3 px-3" : "justify-center px-0"
               } ${isActive ? activeButtonClass : drawerButtonClass}`}
             >
               <Icon
                 size={22}
                 strokeWidth={2.25}
-                className="shrink-0 transition-transform duration-300 ease-in-out group-hover:scale-105"
+                className="shrink-0 transition-transform duration-[350ms] ease-in-out group-hover:scale-105"
               />
 
               <span
-                className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-300 ease-in-out ${
+                className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-[350ms] ease-in-out ${
                   isExpanded
                     ? "max-w-32 translate-x-0 opacity-100"
                     : "max-w-0 -translate-x-2 opacity-0"
@@ -179,18 +242,18 @@ const Drawer = () => {
               type="button"
               title={label}
               onClick={() => path && navigate(path)}
-              className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-300 ease-in-out hover:cursor-pointer ${
+              className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-[350ms] ease-in-out hover:cursor-pointer ${
                 isExpanded ? "justify-start gap-3 px-3" : "justify-center px-0"
               } ${isActive ? activeButtonClass : drawerButtonClass}`}
             >
               <Icon
                 size={22}
                 strokeWidth={2.25}
-                className="shrink-0 transition-transform duration-300 ease-in-out group-hover:scale-105"
+                className="shrink-0 transition-transform duration-[350ms] ease-in-out group-hover:scale-105"
               />
 
               <span
-                className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-300 ease-in-out ${
+                className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-[350ms] ease-in-out ${
                   isExpanded
                     ? "max-w-32 translate-x-0 opacity-100"
                     : "max-w-0 -translate-x-2 opacity-0"
@@ -202,13 +265,86 @@ const Drawer = () => {
           );
         })}
 
-        <div className="flex-1" />
+        <div
+          aria-hidden="true"
+          onClick={() => setIsContactOpen(false)}
+          className="w-full flex-1"
+        />
+
+        <div className="w-full">
+          <button
+            type="button"
+            title="Contact creator"
+            onClick={handleContactToggle}
+            aria-expanded={isExpanded && isContactOpen}
+            className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-[350ms] ease-in-out hover:cursor-pointer ${
+              isExpanded ? "justify-start gap-3 px-3" : "justify-center"
+            } ${drawerButtonClass}`}
+          >
+            <Send
+              size={22}
+              strokeWidth={2.25}
+              className="shrink-0 transition-transform duration-[350ms] ease-in-out group-hover:scale-105"
+            />
+
+            {isExpanded && (
+              <>
+                <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left text-[13px]">
+                  Contact creator
+                </span>
+
+                <ChevronRight
+                  size={16}
+                  strokeWidth={2.4}
+                  className={`shrink-0 transition-transform duration-[350ms] ease-in-out ${
+                    isContactOpen ? "rotate-90" : ""
+                  }`}
+                />
+              </>
+            )}
+          </button>
+
+          {isExpanded && (
+            <div
+              className={`grid overflow-hidden rounded-xl border shadow-sm transition-all duration-[350ms] ease-in-out ${
+                isLight
+                  ? "border-gray-200 bg-white shadow-gray-900/5"
+                  : "border-gray-700 bg-gray-800/80 shadow-black/10"
+              } ${
+                isContactOpen
+                  ? "mt-1 max-h-24 translate-y-0 p-1 opacity-100"
+                  : "mt-0 max-h-0 -translate-y-1 p-0 opacity-0"
+              }`}
+            >
+              {creatorLinks.map(({ title, href, icon: Icon }) => (
+                <a
+                  key={title}
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`group flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-bold transition-all duration-200 hover:cursor-pointer ${
+                    isLight
+                      ? "text-gray-600 hover:bg-amber-50 hover:text-red-600"
+                      : "text-gray-300 hover:bg-gray-700 hover:text-amber-100"
+                  }`}
+                >
+                  <Icon
+                    size={17}
+                    strokeWidth={2.25}
+                    className="shrink-0 transition-transform duration-200 group-hover:scale-105"
+                  />
+                  <span>{title}</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
 
         <button
           type="button"
           title={t("drawer.profile")}
           onClick={() => navigate("/profile")}
-          className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-300 ease-in-out hover:cursor-pointer ${
+          className={`group flex h-11 w-full items-center rounded-lg border border-transparent text-sm font-semibold transition-all duration-[350ms] ease-in-out hover:cursor-pointer ${
             isExpanded ? "justify-start gap-3 px-3" : "justify-center px-0"
           } ${
             location.pathname === "/profile"
@@ -219,11 +355,11 @@ const Drawer = () => {
           <CircleUserRound
             size={22}
             strokeWidth={2.25}
-            className="shrink-0 transition-transform duration-300 ease-in-out group-hover:scale-105"
+            className="shrink-0 transition-transform duration-[350ms] ease-in-out group-hover:scale-105"
           />
 
           <span
-            className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-300 ease-in-out ${
+            className={`overflow-hidden whitespace-nowrap text-[13px] transition-all duration-[350ms] ease-in-out ${
               isExpanded
                 ? "max-w-32 translate-x-0 opacity-100"
                 : "max-w-0 -translate-x-2 opacity-0"

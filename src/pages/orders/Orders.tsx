@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
   BadgeCheck,
   Ban,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   CircleDollarSign,
   ClipboardList,
   CreditCard,
+  Filter,
   LoaderCircle,
   Minus,
   Package,
@@ -16,8 +20,10 @@ import {
   Timer,
   Trash2,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 
 import {
   cancelOrder,
@@ -38,9 +44,9 @@ type OrderItemDraft = {
   quantity: string;
 };
 
-const paymentTypes: Array<{ label: string; value: PaymentType }> = [
-  { label: "Cash", value: 0 },
-  { label: "Card", value: 1 },
+const paymentTypes: Array<{ labelKey: string; value: PaymentType }> = [
+  { labelKey: "orders.payment.cash", value: 0 },
+  { labelKey: "orders.payment.card", value: 1 },
 ];
 const statusOptions: OrderStatus[] = [
   "Created",
@@ -49,6 +55,21 @@ const statusOptions: OrderStatus[] = [
   "Completed",
   "Rejected",
 ];
+const orderWorkflowStatuses: OrderStatus[] = [
+  "Created",
+  "Approved",
+  "InProgress",
+  "Completed",
+];
+const rejectedWorkflowStatuses: OrderStatus[] = [
+  "Created",
+  "Approved",
+  "InProgress",
+  "Rejected",
+];
+const orderStatusFilterOptions = ["All", ...statusOptions] as const;
+type OrderStatusFilter = (typeof orderStatusFilterOptions)[number];
+const ORDERS_PER_PAGE = 5;
 
 const formatCurrency = (value: number | null | undefined, locale: string) =>
   new Intl.NumberFormat(locale, {
@@ -108,10 +129,77 @@ const getStatusStyle = (status: string, isLight: boolean) => {
     : "border-amber-300/70 bg-amber-500/15 text-amber-100";
 };
 
+const getStatusIcon = (status: string): LucideIcon => {
+  const normalizedStatus = status.toLowerCase();
+
+  if (normalizedStatus === "completed") return BadgeCheck;
+  if (normalizedStatus === "approved") return CheckCircle2;
+  if (normalizedStatus === "inprogress") return Timer;
+  if (normalizedStatus === "rejected") return Ban;
+
+  return ClipboardList;
+};
+
+const getStatusAccentStyle = (status: string) => {
+  const normalizedStatus = status.toLowerCase();
+
+  if (normalizedStatus === "completed") return "bg-emerald-500";
+  if (normalizedStatus === "approved" || normalizedStatus === "inprogress") {
+    return "bg-blue-500";
+  }
+  if (normalizedStatus === "rejected") return "bg-red-500";
+
+  return "bg-amber-500";
+};
+
+const getStatusSolidStyle = (status: string) => {
+  const normalizedStatus = status.toLowerCase();
+
+  if (normalizedStatus === "completed") {
+    return "border-emerald-500 bg-emerald-500 text-white";
+  }
+  if (normalizedStatus === "approved" || normalizedStatus === "inprogress") {
+    return "border-blue-500 bg-blue-500 text-white";
+  }
+  if (normalizedStatus === "rejected") {
+    return "border-red-500 bg-red-500 text-white";
+  }
+
+  return "border-amber-500 bg-amber-500 text-white";
+};
+
+const getStatusActiveTextStyle = (status: string, isLight: boolean) => {
+  const normalizedStatus = status.toLowerCase();
+
+  if (normalizedStatus === "completed") {
+    return isLight ? "text-emerald-700" : "text-emerald-200";
+  }
+  if (normalizedStatus === "approved" || normalizedStatus === "inprogress") {
+    return isLight ? "text-blue-700" : "text-blue-200";
+  }
+  if (normalizedStatus === "rejected") {
+    return isLight ? "text-red-700" : "text-red-200";
+  }
+
+  return isLight ? "text-amber-700" : "text-amber-200";
+};
+
+const getStatusLineStyle = (status: string) => {
+  const normalizedStatus = status.toLowerCase();
+
+  if (normalizedStatus === "completed") return "bg-emerald-500";
+  if (normalizedStatus === "approved" || normalizedStatus === "inprogress") {
+    return "bg-blue-500";
+  }
+  if (normalizedStatus === "rejected") return "bg-red-500";
+
+  return "bg-amber-500";
+};
+
 const Orders = () => {
   const theme = useThemeStore((state) => state.theme);
   const currentUser = useAuthStore((state) => state.user);
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -119,13 +207,43 @@ const Orders = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isCreateDialogVisible, setIsCreateDialogVisible] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createErrorMessage, setCreateErrorMessage] = useState("");
   const [paymentType, setPaymentType] = useState<PaymentType>(0);
   const [orderItemDrafts, setOrderItemDrafts] = useState<OrderItemDraft[]>([]);
   const [updatingOrderId, setUpdatingOrderId] = useState("");
+  const [statusFilter, setStatusFilter] = useState<OrderStatusFilter>("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const createDialogAnimationFrameRef = useRef<number | null>(null);
+  const createDialogCloseTimerRef = useRef<number | null>(null);
   const isLight = theme === "light";
   const locale = i18n.resolvedLanguage ?? i18n.language;
+
+  const getTranslatedStatusLabel = (status: string) => {
+    const normalizedStatus = status.toLowerCase();
+    const statusKey =
+      normalizedStatus === "created"
+        ? "Created"
+        : normalizedStatus === "approved"
+        ? "Approved"
+        : normalizedStatus === "inprogress"
+        ? "inProgress"
+        : normalizedStatus === "completed"
+        ? "Completed"
+        : normalizedStatus === "rejected"
+        ? "Rejected"
+        : status;
+
+    return t(`orders.status.${statusKey}`, {
+      defaultValue: normalizedStatus === "inprogress" ? "In Progress" : status,
+    });
+  };
+
+  const getStatusFilterLabel = (status: OrderStatusFilter) =>
+    status === "All"
+      ? t("orders.filters.allStatuses")
+      : getTranslatedStatusLabel(status);
 
   const productById = useMemo(() => {
     return new Map(products.map((product) => [product.id, product]));
@@ -149,7 +267,8 @@ const Orders = () => {
       setOrders(ordersResponse);
       setProducts(productsResponse);
     } catch {
-      setErrorMessage("Orders could not be loaded. Please try again.");
+      setErrorMessage("orders.loadError");
+      toast.error(t("orders.loadError"), { id: "orders-load-error" });
     } finally {
       setIsLoading(false);
     }
@@ -167,7 +286,8 @@ const Orders = () => {
       })
       .catch(() => {
         if (isActive) {
-          setErrorMessage("Orders could not be loaded. Please try again.");
+          setErrorMessage("orders.loadError");
+          toast.error(t("orders.loadError"), { id: "orders-load-error" });
         }
       })
       .finally(() => {
@@ -177,7 +297,7 @@ const Orders = () => {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const query = search.trim();
@@ -191,8 +311,21 @@ const Orders = () => {
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    return () => {
+      if (createDialogAnimationFrameRef.current) {
+        window.cancelAnimationFrame(createDialogAnimationFrameRef.current);
+      }
+
+      if (createDialogCloseTimerRef.current) {
+        window.clearTimeout(createDialogCloseTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleSearchChange = (value: string) => {
     setSearch(value);
+    setCurrentPage(1);
 
     if (value.trim().length < 2) {
       setDebouncedSearch("");
@@ -202,6 +335,7 @@ const Orders = () => {
   const handleSearchClear = () => {
     setSearch("");
     setDebouncedSearch("");
+    setCurrentPage(1);
   };
 
   const resetCreateForm = () => {
@@ -211,19 +345,52 @@ const Orders = () => {
   };
 
   const openCreateDialog = () => {
+    if (createDialogAnimationFrameRef.current) {
+      window.cancelAnimationFrame(createDialogAnimationFrameRef.current);
+    }
+
+    if (createDialogCloseTimerRef.current) {
+      window.clearTimeout(createDialogCloseTimerRef.current);
+      createDialogCloseTimerRef.current = null;
+    }
+
     setCreateErrorMessage("");
     setIsCreateDialogOpen(true);
+    setIsCreateDialogVisible(false);
+
+    createDialogAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      setIsCreateDialogVisible(true);
+      createDialogAnimationFrameRef.current = null;
+    });
 
     if (products.length > 0 && orderItemDrafts.length === 0) {
       setOrderItemDrafts([{ productId: products[0].id, quantity: "1" }]);
     }
   };
 
+  const finishCreateDialogClose = () => {
+    if (createDialogAnimationFrameRef.current) {
+      window.cancelAnimationFrame(createDialogAnimationFrameRef.current);
+      createDialogAnimationFrameRef.current = null;
+    }
+
+    if (createDialogCloseTimerRef.current) {
+      window.clearTimeout(createDialogCloseTimerRef.current);
+    }
+
+    setIsCreateDialogVisible(false);
+
+    createDialogCloseTimerRef.current = window.setTimeout(() => {
+      setIsCreateDialogOpen(false);
+      resetCreateForm();
+      createDialogCloseTimerRef.current = null;
+    }, 320);
+  };
+
   const closeCreateDialog = () => {
     if (isCreating) return;
 
-    setIsCreateDialogOpen(false);
-    resetCreateForm();
+    finishCreateDialogClose();
   };
 
   const handleOrderItemDraftChange = (
@@ -250,11 +417,16 @@ const Orders = () => {
     handleOrderItemDraftChange(index, "quantity", String(nextQuantity));
   };
 
+  const showCreateError = (messageKey: string) => {
+    setCreateErrorMessage(messageKey);
+    toast.error(t(messageKey));
+  };
+
   const addOrderItemDraft = () => {
     const firstProduct = products[0];
 
     if (!firstProduct) {
-      setCreateErrorMessage("No products are available.");
+      showCreateError("orders.create.noProductsAvailable");
       return;
     }
 
@@ -292,7 +464,7 @@ const Orders = () => {
     event.preventDefault();
 
     if (!currentUser?.id) {
-      setCreateErrorMessage("Current user could not be resolved.");
+      showCreateError("orders.create.userMissing");
       return;
     }
 
@@ -307,7 +479,7 @@ const Orders = () => {
           item.quantity <= 0
       )
     ) {
-      setCreateErrorMessage("Choose at least one product and quantity.");
+      showCreateError("orders.create.productQuantityInvalid");
       return;
     }
 
@@ -324,9 +496,11 @@ const Orders = () => {
 
       const refreshedOrders = await getOrders();
       setOrders(refreshedOrders);
-      closeCreateDialog();
+      toast.success(t("orders.toast.created"));
+      finishCreateDialogClose();
     } catch {
-      setCreateErrorMessage("Order could not be created.");
+      setCreateErrorMessage("orders.create.createError");
+      toast.error(t("orders.toast.createError"));
     } finally {
       setIsCreating(false);
     }
@@ -343,6 +517,13 @@ const Orders = () => {
     try {
       await changeOrderStatus({ orderId, status });
       await refreshOrdersOnly();
+      toast.success(
+        t("orders.toast.statusChanged", {
+          status: getTranslatedStatusLabel(status),
+        })
+      );
+    } catch {
+      toast.error(t("orders.toast.statusError"));
     } finally {
       setUpdatingOrderId("");
     }
@@ -354,6 +535,9 @@ const Orders = () => {
     try {
       await cancelOrder(orderId);
       await refreshOrdersOnly();
+      toast.success(t("orders.toast.cancelled"));
+    } catch {
+      toast.error(t("orders.toast.cancelError"));
     } finally {
       setUpdatingOrderId("");
     }
@@ -365,6 +549,9 @@ const Orders = () => {
     try {
       await completeOrder(orderId);
       await refreshOrdersOnly();
+      toast.success(t("orders.toast.completed"));
+    } catch {
+      toast.error(t("orders.toast.completeError"));
     } finally {
       setUpdatingOrderId("");
     }
@@ -372,10 +559,17 @@ const Orders = () => {
 
   const filteredOrders = useMemo(() => {
     const query = debouncedSearch.toLowerCase();
+    const byStatus =
+      statusFilter === "All"
+        ? orders
+        : orders.filter(
+            (order) =>
+              order.status.toLowerCase() === statusFilter.toLowerCase()
+          );
 
-    if (!query) return orders;
+    if (!query) return byStatus;
 
-    return orders.filter((order) => {
+    return byStatus.filter((order) => {
       const productNames = order.items
         .map((item) => productById.get(item.productId)?.name ?? item.productId)
         .join(" ");
@@ -384,7 +578,23 @@ const Orders = () => {
         (value) => value.toLowerCase().includes(query)
       );
     });
-  }, [debouncedSearch, orders, productById]);
+  }, [debouncedSearch, orders, productById, statusFilter]);
+
+  const pageCount = Math.max(
+    1,
+    Math.ceil(filteredOrders.length / ORDERS_PER_PAGE)
+  );
+  const safeCurrentPage = Math.min(currentPage, pageCount);
+  const pageStartIndex = (safeCurrentPage - 1) * ORDERS_PER_PAGE;
+  const pageEndIndex = pageStartIndex + ORDERS_PER_PAGE;
+  const paginatedOrders = filteredOrders.slice(pageStartIndex, pageEndIndex);
+  const visiblePageNumbers = Array.from(
+    { length: pageCount },
+    (_, index) => index + 1
+  ).filter(
+    (page) =>
+      page === 1 || page === pageCount || Math.abs(page - safeCurrentPage) <= 1
+  );
 
   const totalRevenue = orders.reduce(
     (total, order) => total + getOrderTotal(order),
@@ -396,17 +606,41 @@ const Orders = () => {
   const activeOrders = orders.filter((order) =>
     ["created", "approved", "inprogress"].includes(order.status.toLowerCase())
   ).length;
+  const statusSummary =
+    statusFilter === "All"
+      ? {
+          label: t("orders.metrics.allOrders"),
+          value: orders.length,
+          icon: ClipboardList,
+        }
+      : {
+          label: t("orders.metrics.statusOrders", {
+            status: getTranslatedStatusLabel(statusFilter),
+          }),
+          value: orders.filter(
+            (order) =>
+              order.status.toLowerCase() === statusFilter.toLowerCase()
+          ).length,
+          icon:
+            statusFilter === "Completed"
+              ? BadgeCheck
+              : statusFilter === "Rejected"
+              ? Ban
+              : statusFilter === "InProgress"
+              ? Timer
+              : ClipboardList,
+        };
   const trimmedSearch = search.trim();
   const isSearchPending =
     trimmedSearch.length >= 2 && trimmedSearch !== debouncedSearch;
 
   return (
     <main
-      className={`flex flex-1 flex-col px-4 py-8 transition-colors duration-300 sm:px-6 lg:px-8 ${
+      className={`flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-6 transition-colors duration-300 sm:px-6 lg:px-8 ${
         isLight ? "bg-gray-50 text-gray-900" : "bg-gray-900 text-white"
       }`}
     >
-      <section className="mx-auto w-full max-w-7xl">
+      <section className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col">
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="flex items-center gap-3">
@@ -415,9 +649,9 @@ const Orders = () => {
               </span>
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.18em] text-red-500">
-                  Sales
+                  {t("orders.eyebrow")}
                 </p>
-                <h1 className="text-3xl font-black">Orders</h1>
+                <h1 className="text-3xl font-black">{t("orders.title")}</h1>
               </div>
             </div>
             <p
@@ -425,24 +659,20 @@ const Orders = () => {
                 isLight ? "text-gray-500" : "text-gray-400"
               }`}
             >
-              Manage order creation, status changes, and fulfillment.
+              {t("orders.subtitle")}
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[620px]">
             {[
+              statusSummary,
               {
-                label: "Orders",
-                value: orders.length,
-                icon: ClipboardList,
-              },
-              {
-                label: "Active",
+                label: t("orders.metrics.active"),
                 value: activeOrders,
                 icon: Timer,
               },
               {
-                label: "Revenue",
+                label: t("orders.metrics.revenue"),
                 value: formatCurrency(totalRevenue, locale),
                 icon: CircleDollarSign,
               },
@@ -474,56 +704,96 @@ const Orders = () => {
         </div>
 
         <div
-          className={`mt-7 overflow-hidden rounded-2xl border shadow-lg ${
+          className={`mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border shadow-lg ${
             isLight
               ? "border-gray-200 bg-white shadow-gray-900/5"
               : "border-gray-700 bg-gray-800 shadow-black/20"
           }`}
         >
           <div
-            className={`flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between ${
+            className={`flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-start lg:justify-between ${
               isLight ? "border-gray-200" : "border-gray-700"
             }`}
           >
-            <div className="w-full lg:max-w-sm">
-              <div className="relative">
-                <Search
-                  size={18}
-                  className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
-                    search
-                      ? "text-red-500"
-                      : isLight
-                      ? "text-gray-400"
-                      : "text-gray-500"
-                  }`}
-                />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(event) => handleSearchChange(event.target.value)}
-                  placeholder="Search orders"
-                  className={`h-11 w-full rounded-lg border pl-10 pr-12 text-sm font-semibold outline-none transition-all duration-200 ${
-                    isLight
-                      ? "border-gray-200 bg-gray-50 placeholder:text-gray-400 focus:border-amber-400"
-                      : "border-gray-600 bg-gray-900 placeholder:text-gray-500 focus:border-amber-400"
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={handleSearchClear}
-                  aria-label="Clear order search"
-                  className={`absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border transition-all duration-200 ease-out ${
-                    search
-                      ? "pointer-events-auto scale-100 opacity-100 hover:cursor-pointer hover:scale-105 active:scale-95"
-                      : "pointer-events-none scale-75 opacity-0"
-                  } ${
-                    isLight
-                      ? "border-gray-300 bg-white text-gray-600 shadow-sm hover:border-red-300 hover:bg-red-50 hover:text-red-600"
-                      : "border-gray-600 bg-gray-800 text-gray-300 shadow-sm hover:border-red-400 hover:bg-red-500/15 hover:text-red-300"
-                  }`}
-                >
-                  <X size={15} strokeWidth={2.5} />
-                </button>
+            <div className="w-full lg:max-w-2xl">
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative min-w-0 flex-1">
+                  <Search
+                    size={18}
+                    className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
+                      search
+                        ? "text-red-500"
+                        : isLight
+                        ? "text-gray-400"
+                        : "text-gray-500"
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    value={search}
+                    onChange={(event) => handleSearchChange(event.target.value)}
+                    placeholder={t("orders.searchPlaceholder")}
+                    className={`h-11 w-full rounded-lg border pl-10 pr-12 text-sm font-semibold outline-none transition-all duration-200 ${
+                      isLight
+                        ? "border-gray-200 bg-gray-50 placeholder:text-gray-400 focus:border-amber-400"
+                        : "border-gray-600 bg-gray-900 placeholder:text-gray-500 focus:border-amber-400"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSearchClear}
+                    aria-label={t("orders.clearSearch")}
+                    className={`absolute right-2 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full border transition-all duration-200 ease-out ${
+                      search
+                        ? "pointer-events-auto scale-100 opacity-100 hover:cursor-pointer hover:scale-105 active:scale-95"
+                        : "pointer-events-none scale-75 opacity-0"
+                    } ${
+                      isLight
+                        ? "border-gray-300 bg-white text-gray-600 shadow-sm hover:border-red-300 hover:bg-red-50 hover:text-red-600"
+                        : "border-gray-600 bg-gray-800 text-gray-300 shadow-sm hover:border-red-400 hover:bg-red-500/15 hover:text-red-300"
+                    }`}
+                  >
+                    <X size={15} strokeWidth={2.5} />
+                  </button>
+                </div>
+
+                <div className="relative sm:w-48">
+                  <Filter
+                    size={17}
+                    className={`pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 ${
+                      statusFilter === "All"
+                        ? isLight
+                          ? "text-gray-400"
+                          : "text-gray-500"
+                        : "text-red-500"
+                    }`}
+                  />
+                  <select
+                    value={statusFilter}
+                    onChange={(event) => {
+                      setStatusFilter(event.target.value as OrderStatusFilter);
+                      setCurrentPage(1);
+                    }}
+                    aria-label={t("orders.filters.aria")}
+                    className={`h-11 w-full appearance-none rounded-lg border pl-10 pr-10 text-sm font-black outline-none transition-all duration-200 hover:cursor-pointer ${
+                      isLight
+                        ? "border-gray-200 bg-gray-50 text-gray-800 shadow-sm focus:border-amber-400 hover:border-amber-300"
+                        : "border-gray-600 bg-gray-900 text-gray-100 shadow-sm shadow-black/10 focus:border-amber-400 hover:border-amber-300"
+                    }`}
+                  >
+                    {orderStatusFilterOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {getStatusFilterLabel(status)}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={17}
+                    className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 ${
+                      isLight ? "text-gray-500" : "text-gray-300"
+                    }`}
+                  />
+                </div>
               </div>
 
               <p
@@ -534,8 +804,8 @@ const Orders = () => {
                 } ${isLight ? "text-gray-500" : "text-gray-400"}`}
               >
                 {trimmedSearch.length === 1
-                  ? "Type one more character to search"
-                  : "Searching..."}
+                  ? t("common.typeMoreToSearch")
+                  : t("common.searching")}
               </p>
             </div>
 
@@ -547,101 +817,203 @@ const Orders = () => {
                     : "border-gray-700 bg-gray-900 text-gray-400"
                 }`}
               >
-                <span>Showing {filteredOrders.length} of {orders.length}</span>
+                <span>
+                  {t("orders.showingRange", {
+                    range:
+                      filteredOrders.length > 0
+                        ? `${pageStartIndex + 1}-${Math.min(
+                            pageEndIndex,
+                            filteredOrders.length
+                          )}`
+                        : "0",
+                    total: filteredOrders.length,
+                  })}
+                </span>
                 <span className="hidden h-1 w-1 rounded-full bg-current sm:block" />
-                <span>{completedOrders} completed</span>
+                <span>
+                  {t("orders.completedCount", { count: completedOrders })}
+                </span>
               </div>
               <button
                 type="button"
                 onClick={openCreateDialog}
-                aria-label="Create order"
+                aria-label={t("orders.createAria")}
                 className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95"
               >
                 <Plus size={21} strokeWidth={2.7} />
-                <span>New order</span>
+                <span>{t("orders.newOrder")}</span>
               </button>
             </div>
           </div>
 
           {isLoading ? (
-            <div className="flex min-h-80 items-center justify-center p-6">
+            <div className="flex flex-1 items-center justify-center p-6">
               <p
                 className={`font-semibold ${
                   isLight ? "text-gray-500" : "text-gray-400"
                 }`}
               >
-                Loading orders...
+                {t("orders.loading")}
               </p>
             </div>
           ) : errorMessage ? (
-            <div className="flex min-h-80 flex-col items-center justify-center p-6 text-center">
-              <p className="font-bold text-red-500">{errorMessage}</p>
+            <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
+              <p className="font-bold text-red-500">{t(errorMessage)}</p>
               <button
                 type="button"
                 onClick={() => void loadOrdersPage()}
                 className="mt-4 flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-98"
               >
                 <RefreshCcw size={17} />
-                Retry
+                {t("common.retry")}
               </button>
             </div>
           ) : filteredOrders.length === 0 ? (
-            <div className="flex min-h-80 flex-col items-center justify-center p-6 text-center">
+            <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
               <ShoppingCart
                 size={38}
                 className={isLight ? "text-gray-300" : "text-gray-600"}
               />
-              <p className="mt-3 font-bold">No orders found</p>
+              <p className="mt-3 font-bold">{t("orders.emptyTitle")}</p>
               <p
                 className={`mt-1 text-sm font-semibold ${
                   isLight ? "text-gray-500" : "text-gray-400"
                 }`}
               >
-                Try a different search term or create a new order.
+                {t("orders.emptyMessage")}
               </p>
             </div>
           ) : (
-            <div className="grid gap-3 p-4">
-              {filteredOrders.map((order) => {
-                const orderTotal = getOrderTotal(order);
-                const isUpdating = updatingOrderId === order.id;
-                const isClosed = ["completed", "rejected"].includes(
-                  order.status.toLowerCase()
-                );
+            <>
+              <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto p-3 sm:p-4">
+                {paginatedOrders.map((order) => {
+                  const orderTotal = getOrderTotal(order);
+                  const isUpdating = updatingOrderId === order.id;
+                  const normalizedStatus = order.status.toLowerCase();
+                  const isCompleted = normalizedStatus === "completed";
+                  const isRejected = normalizedStatus === "rejected";
+                  const isClosed = ["completed", "rejected"].includes(
+                    normalizedStatus
+                  );
+                  const StatusIcon = getStatusIcon(order.status);
+                  const workflowStatuses =
+                    normalizedStatus === "rejected"
+                      ? rejectedWorkflowStatuses
+                      : orderWorkflowStatuses;
+                  const currentWorkflowIndex = Math.max(
+                    0,
+                    workflowStatuses.findIndex(
+                      (status) => status.toLowerCase() === normalizedStatus
+                    )
+                  );
 
-                return (
-                  <article
-                    key={order.id}
-                    className={`relative overflow-hidden rounded-xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${
-                      isLight
-                        ? "border-gray-200 bg-gray-50 hover:border-amber-300 hover:bg-white hover:shadow-gray-900/10"
-                        : "border-gray-700 bg-gray-900 hover:border-amber-300 hover:bg-gray-800 hover:shadow-black/30"
-                    }`}
-                  >
-                    <span className="absolute inset-y-0 left-0 w-1 bg-red-500" />
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(220px,0.7fr)]">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="break-all text-lg font-black">
-                            Order {order.id.slice(0, 8)}
-                          </h2>
-                          <span
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-black ${getStatusStyle(
-                              order.status,
+                  return (
+                    <article
+                      key={order.id}
+                      className={`relative overflow-hidden rounded-xl border p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 sm:p-4 ${
+                        isLight
+                          ? "border-gray-200 bg-gray-50 hover:border-amber-300 hover:bg-white hover:shadow-gray-900/10"
+                          : "border-gray-700 bg-gray-900 hover:border-amber-300 hover:bg-gray-800 hover:shadow-black/30"
+                      }`}
+                    >
+                      <span
+                        className={`absolute inset-y-0 left-0 w-1 ${getStatusAccentStyle(
+                          order.status
+                        )}`}
+                      />
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(220px,0.7fr)]">
+                        <div className="min-w-0">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0">
+                              <h2 className="break-all text-lg font-black">
+                                {t("orders.orderShort", {
+                                  id: order.id.slice(0, 8),
+                                })}
+                              </h2>
+                              <p
+                                className={`mt-1 text-sm font-semibold ${
+                                  isLight ? "text-gray-500" : "text-gray-400"
+                                }`}
+                              >
+                                {formatDate(
+                                  order.createdAt,
+                                  locale,
+                                  t("common.notAvailable")
+                                )}
+                              </p>
+                            </div>
+                            <span
+                              className={`inline-flex min-h-9 w-fit shrink-0 items-center gap-2 rounded-full border px-4 py-1.5 text-sm font-black ${getStatusStyle(
+                                order.status,
+                                isLight
+                              )}`}
+                            >
+                              <StatusIcon size={16} strokeWidth={2.6} />
+                              {getTranslatedStatusLabel(order.status)}
+                            </span>
+                          </div>
+
+                          <div
+                            className={`mt-4 rounded-xl border px-3 py-3 ${
                               isLight
-                            )}`}
+                                ? "border-gray-200 bg-white"
+                                : "border-gray-700 bg-gray-800"
+                            }`}
                           >
-                            <BadgeCheck size={14} />
-                            {order.status}
-                          </span>
-                        </div>
-                        <p
-                          className={`mt-1 text-sm font-semibold ${
-                            isLight ? "text-gray-500" : "text-gray-400"
-                          }`}
-                        >
-                          {formatDate(order.createdAt, locale, "Not available")}
-                        </p>
+                            <div className="flex items-start gap-2 overflow-x-auto pb-1">
+                              {workflowStatuses.map((status, index) => {
+                                const StepIcon = getStatusIcon(status);
+                                const isReached = index <= currentWorkflowIndex;
+                                const isCurrent =
+                                  status.toLowerCase() === normalizedStatus;
+                                const isConnectorReached =
+                                  index < currentWorkflowIndex;
+
+                                return (
+                                  <Fragment key={status}>
+                                    <div className="flex min-w-[76px] flex-1 flex-col items-center gap-1 text-center">
+                                      <span
+                                        className={`flex size-10 items-center justify-center rounded-full border-2 transition-colors duration-200 ${
+                                          isReached
+                                            ? getStatusSolidStyle(order.status)
+                                            : isLight
+                                            ? "border-gray-200 bg-gray-50 text-gray-400"
+                                            : "border-gray-600 bg-gray-900 text-gray-500"
+                                        }`}
+                                      >
+                                        <StepIcon size={17} strokeWidth={2.6} />
+                                      </span>
+                                      <span
+                                        className={`w-full truncate text-xs font-black ${
+                                          isCurrent || isReached
+                                            ? getStatusActiveTextStyle(
+                                                order.status,
+                                                isLight
+                                              )
+                                            : isLight
+                                            ? "text-gray-400"
+                                            : "text-gray-500"
+                                        }`}
+                                      >
+                                        {getTranslatedStatusLabel(status)}
+                                      </span>
+                                    </div>
+                                    {index < workflowStatuses.length - 1 && (
+                                      <span
+                                        className={`mt-5 h-0.5 min-w-5 flex-1 rounded-full ${
+                                          isConnectorReached
+                                            ? getStatusLineStyle(order.status)
+                                            : isLight
+                                            ? "bg-gray-200"
+                                            : "bg-gray-700"
+                                        }`}
+                                      />
+                                    )}
+                                  </Fragment>
+                                );
+                              })}
+                            </div>
+                          </div>
 
                         <div className="mt-4 grid gap-2">
                           {order.items.map((item) => {
@@ -671,7 +1043,12 @@ const Orders = () => {
                                   </p>
                                 </div>
                                 <p className="font-bold">
-                                  Qty {formatNumber(item.quantity, locale)}
+                                  {t("orders.quantityShort", {
+                                    quantity: formatNumber(
+                                      item.quantity,
+                                      locale
+                                    ),
+                                  })}
                                 </p>
                                 <p className="font-black sm:text-right">
                                   {formatCurrency(
@@ -692,7 +1069,7 @@ const Orders = () => {
                               isLight ? "text-gray-500" : "text-gray-400"
                             }`}
                           >
-                            Total
+                            {t("orders.total")}
                           </p>
                           <p className="text-2xl font-black">
                             {formatCurrency(orderTotal, locale)}
@@ -721,7 +1098,7 @@ const Orders = () => {
                           >
                             {statusOptions.map((status) => (
                               <option key={status} value={status}>
-                                {status}
+                                {getTranslatedStatusLabel(status)}
                               </option>
                             ))}
                           </select>
@@ -730,46 +1107,153 @@ const Orders = () => {
                             type="button"
                             onClick={() => void handleCompleteOrder(order.id)}
                             disabled={isUpdating || isClosed}
-                            className="flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3 text-sm font-black text-white transition-all duration-200 hover:cursor-pointer hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                            className={`flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-black transition-all duration-200 active:scale-95 disabled:cursor-not-allowed ${
+                              isCompleted
+                                ? isLight
+                                  ? "border-emerald-300 bg-transparent text-emerald-500"
+                                  : "border-emerald-500/50 bg-transparent text-emerald-300/80"
+                                : "border-emerald-600 bg-emerald-600 text-white hover:cursor-pointer hover:bg-emerald-700 disabled:opacity-50"
+                            }`}
                           >
                             {isUpdating ? (
                               <LoaderCircle size={16} className="animate-spin" />
                             ) : (
                               <CheckCircle2 size={16} />
                             )}
-                            Complete
+                            {t("orders.actions.complete")}
                           </button>
 
                           <button
                             type="button"
                             onClick={() => void handleCancelOrder(order.id)}
                             disabled={isUpdating || isClosed}
-                            className="flex h-10 items-center justify-center gap-2 rounded-lg bg-red-500 px-3 text-sm font-black text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-2"
+                            className={`flex h-10 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-black transition-all duration-200 active:scale-95 disabled:cursor-not-allowed sm:col-span-2 ${
+                              isRejected
+                                ? isLight
+                                  ? "border-red-300 bg-transparent text-red-500"
+                                  : "border-red-500/50 bg-transparent text-red-300/80"
+                                : "border-red-500 bg-red-500 text-white hover:cursor-pointer hover:bg-red-600 disabled:opacity-50"
+                            }`}
                           >
                             <Ban size={16} />
-                            Cancel
+                            {t("orders.actions.cancel")}
                           </button>
                         </div>
                       </div>
                     </div>
                   </article>
                 );
-              })}
-            </div>
+                })}
+              </div>
+
+              <div
+                className={`flex flex-col items-center gap-3 border-t px-4 py-3 sm:flex-row sm:justify-between ${
+                  isLight ? "border-gray-200" : "border-gray-700"
+                }`}
+              >
+                <p
+                  className={`self-start text-sm font-semibold ${
+                    isLight ? "text-gray-500" : "text-gray-400"
+                  }`}
+                >
+                  {t("orders.pageOf", {
+                    page: safeCurrentPage,
+                    total: pageCount,
+                  })}
+                </p>
+
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage(Math.max(1, safeCurrentPage - 1))
+                    }
+                    disabled={safeCurrentPage === 1}
+                    aria-label={t("orders.pagination.previous")}
+                    className={`flex size-10 items-center justify-center rounded-lg border transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${
+                      isLight
+                        ? "border-gray-200 bg-white text-gray-600 hover:border-amber-300 hover:bg-amber-50 hover:text-red-600"
+                        : "border-gray-700 bg-gray-900 text-gray-300 hover:border-amber-300 hover:bg-gray-700 hover:text-amber-100"
+                    }`}
+                  >
+                    <ChevronLeft size={18} strokeWidth={2.6} />
+                  </button>
+
+                  {visiblePageNumbers.map((page, index) => {
+                    const previousPage = visiblePageNumbers[index - 1];
+                    const hasGap = previousPage && page - previousPage > 1;
+                    const isActive = page === safeCurrentPage;
+
+                    return (
+                      <div key={page} className="flex items-center gap-2">
+                        {hasGap && (
+                          <span
+                            className={`px-1 text-sm font-black ${
+                              isLight ? "text-gray-400" : "text-gray-500"
+                            }`}
+                          >
+                            ...
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage(page)}
+                          aria-label={t("orders.pagination.goTo", { page })}
+                          className={`flex size-10 items-center justify-center rounded-lg border text-sm font-black transition-all duration-200 hover:cursor-pointer active:scale-95 ${
+                            isActive
+                              ? "border-red-500 bg-red-500 text-white shadow-md shadow-red-950/15"
+                              : isLight
+                              ? "border-gray-200 bg-white text-gray-600 hover:border-amber-300 hover:bg-amber-50 hover:text-red-600"
+                              : "border-gray-700 bg-gray-900 text-gray-300 hover:border-amber-300 hover:bg-gray-700 hover:text-amber-100"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCurrentPage(Math.min(pageCount, safeCurrentPage + 1))
+                    }
+                    disabled={safeCurrentPage === pageCount}
+                    aria-label={t("orders.pagination.next")}
+                    className={`flex size-10 items-center justify-center rounded-lg border transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${
+                      isLight
+                        ? "border-gray-200 bg-white text-gray-600 hover:border-amber-300 hover:bg-amber-50 hover:text-red-600"
+                        : "border-gray-700 bg-gray-900 text-gray-300 hover:border-amber-300 hover:bg-gray-700 hover:text-amber-100"
+                    }`}
+                  >
+                    <ChevronRight size={18} strokeWidth={2.6} />
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </section>
 
       {isCreateDialogOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/45 px-4 py-5 backdrop-blur-[2px] sm:items-center"
+          aria-hidden={!isCreateDialogVisible}
+          className={`fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/45 px-4 py-5 backdrop-blur-[2px] transition-all duration-300 ease-out sm:items-center ${
+            isCreateDialogVisible
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
+          }`}
           onClick={closeCreateDialog}
         >
           <section
-            className={`w-full max-w-3xl overflow-hidden rounded-2xl border shadow-2xl transition-colors duration-300 ${
+            className={`w-full max-w-3xl overflow-hidden rounded-2xl border shadow-2xl transition-all duration-300 ease-out ${
               isLight
                 ? "border-gray-200 bg-white text-gray-900 shadow-gray-950/15"
                 : "border-gray-700 bg-gray-800 text-white shadow-black/35"
+            } ${
+              isCreateDialogVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-6 scale-[0.98] opacity-0"
             }`}
             onClick={(event) => event.stopPropagation()}
           >
@@ -783,16 +1267,18 @@ const Orders = () => {
                   </span>
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-red-500">
-                      New order
+                      {t("orders.create.eyebrow")}
                     </p>
-                    <h2 className="text-xl font-black">Create Order</h2>
+                    <h2 className="text-xl font-black">
+                      {t("orders.create.title")}
+                    </h2>
                   </div>
                 </div>
 
                 <button
                   type="button"
                   onClick={closeCreateDialog}
-                  aria-label="Close create order dialog"
+                  aria-label={t("orders.create.closeAria")}
                   disabled={isCreating}
                   className={`flex size-10 shrink-0 items-center justify-center rounded-full border transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
                     isLight
@@ -818,11 +1304,11 @@ const Orders = () => {
                     }`}
                   >
                     <CreditCard size={15} className="text-red-500" />
-                    Payment
+                    {t("orders.payment.label")}
                   </div>
 
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    {paymentTypes.map(({ label, value }) => {
+                    {paymentTypes.map(({ labelKey, value }) => {
                       const isActive = paymentType === value;
 
                       return (
@@ -839,7 +1325,7 @@ const Orders = () => {
                               : "border-gray-700 bg-gray-800 text-gray-300 hover:border-amber-300 hover:bg-gray-700 hover:text-amber-100"
                           }`}
                         >
-                          {label}
+                          {t(labelKey)}
                         </button>
                       );
                     })}
@@ -860,7 +1346,7 @@ const Orders = () => {
                       }`}
                     >
                       <Package size={15} className="text-red-500" />
-                      Products
+                      {t("orders.create.products")}
                     </div>
                     <button
                       type="button"
@@ -869,7 +1355,7 @@ const Orders = () => {
                       className="flex h-10 items-center justify-center gap-2 rounded-xl bg-red-500 px-3 text-sm font-black text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       <Plus size={17} strokeWidth={2.7} />
-                      Add product
+                      {t("orders.create.addProduct")}
                     </button>
                   </div>
 
@@ -881,7 +1367,7 @@ const Orders = () => {
                           : "border-gray-700 bg-gray-800 text-gray-400"
                       }`}
                     >
-                      Add at least one product.
+                      {t("orders.create.addAtLeastOne")}
                     </div>
                   ) : (
                     <div className="mt-3 grid gap-3">
@@ -907,7 +1393,7 @@ const Orders = () => {
                                   isLight ? "text-gray-500" : "text-gray-400"
                                 }`}
                               >
-                                Product
+                                {t("orders.create.product")}
                               </span>
                               <select
                                 value={draft.productId}
@@ -940,7 +1426,7 @@ const Orders = () => {
                                   isLight ? "text-gray-500" : "text-gray-400"
                                 }`}
                               >
-                                Quantity
+                                {t("orders.create.quantity")}
                               </span>
                               <div
                                 className={`flex h-11 overflow-hidden rounded-xl border ${
@@ -953,7 +1439,9 @@ const Orders = () => {
                                   type="button"
                                   onClick={() => adjustOrderItemQuantity(index, -1)}
                                   disabled={isCreating}
-                                  aria-label="Decrease order item quantity"
+                                  aria-label={t(
+                                    "orders.create.decreaseQuantity"
+                                  )}
                                   className={`flex w-11 shrink-0 items-center justify-center border-r transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                                     isLight
                                       ? "border-gray-200 text-gray-600 hover:bg-red-50 hover:text-red-600"
@@ -985,7 +1473,9 @@ const Orders = () => {
                                   type="button"
                                   onClick={() => adjustOrderItemQuantity(index, 1)}
                                   disabled={isCreating}
-                                  aria-label="Increase order item quantity"
+                                  aria-label={t(
+                                    "orders.create.increaseQuantity"
+                                  )}
                                   className="flex w-11 shrink-0 items-center justify-center bg-red-500 text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
                                 >
                                   <Plus size={17} strokeWidth={2.7} />
@@ -1004,7 +1494,7 @@ const Orders = () => {
                               type="button"
                               onClick={() => removeOrderItemDraft(index)}
                               disabled={isCreating || orderItemDrafts.length === 1}
-                              aria-label="Remove order product"
+                              aria-label={t("orders.create.removeProduct")}
                               className={`flex h-11 items-center justify-center rounded-xl border transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${
                                 isLight
                                   ? "border-gray-200 text-gray-500 hover:border-red-300 hover:bg-red-50 hover:text-red-600"
@@ -1033,7 +1523,7 @@ const Orders = () => {
                         isLight ? "text-gray-500" : "text-gray-400"
                       }`}
                     >
-                      Total
+                      {t("orders.total")}
                     </span>
                     <span className="text-2xl font-black">
                       {formatCurrency(createDraftTotal, locale)}
@@ -1048,7 +1538,7 @@ const Orders = () => {
                       : "-translate-y-1 opacity-0"
                   }`}
                 >
-                  {createErrorMessage || "Ready"}
+                  {createErrorMessage ? t(createErrorMessage) : t("common.ready")}
                 </p>
 
                 <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -1062,7 +1552,7 @@ const Orders = () => {
                         : "border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-700"
                     }`}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                   <button
                     type="submit"
@@ -1072,7 +1562,7 @@ const Orders = () => {
                     {isCreating && (
                       <LoaderCircle size={17} className="animate-spin" />
                     )}
-                    Create
+                    {t("common.create")}
                   </button>
                 </div>
               </form>

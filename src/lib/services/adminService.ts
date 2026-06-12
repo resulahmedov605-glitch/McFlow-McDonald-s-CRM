@@ -12,11 +12,22 @@ export type AdminUser = {
   loginedAt: string | null;
 };
 
+export type AdminCreateUser = {
+  fullName: string;
+  username: string;
+  email: string;
+  password: string;
+};
+
 export const getUsers = async () => {
   const response = await api.get<AdminUser[]>("/api/Admin/users");
   return response.data;
 };
 
+export const createUser = async (userData: AdminCreateUser) => {
+  const response = await api.post("/api/Admin/create-user", userData);
+  return response.data;
+};
 
 export const changeUserProfilePic = async (userId: string, formFile: File) => {
   const formData = new FormData();

@@ -36,6 +36,10 @@ export const createProduct = async (
   await api.post("/api/Product", request);
 };
 
+export const deleteProduct = async (id: string): Promise<void> => {
+  await api.delete(`/api/Product/${id}`);
+};
+
 export const uploadProductImage = async (file: File): Promise<string> => {
   const formData = new FormData();
   formData.append("file", file, file.name);

@@ -4,6 +4,7 @@ import {
   Boxes,
   CalendarDays,
   CircleDollarSign,
+  CreditCard,
   FileText,
   ImageOff,
   ImagePlus,
@@ -13,6 +14,7 @@ import {
   Plus,
   RefreshCcw,
   Search,
+  ShoppingCart,
   Sparkles,
   Tag,
   Trash2,
@@ -20,9 +22,11 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 
 import {
   createProduct,
+  deleteProduct,
   getProducts,
   uploadProductImage,
   type Product,
@@ -31,7 +35,12 @@ import {
   getProductItems,
   type ProductItem,
 } from "../../lib/services/productItemsService";
+import {
+  createOrder,
+  type PaymentType,
+} from "../../lib/services/orderService";
 import { API_BASE_URL } from "../../store/apiStore";
+import useAuthStore from "../../store/authStore";
 import { useThemeStore } from "../../store/useThemeStore";
 
 const formatCurrency = (value: number | null | undefined, locale: string) =>
@@ -43,7 +52,6 @@ const formatCurrency = (value: number | null | undefined, locale: string) =>
 
 const formatDate = (
   value: string | null | undefined,
-  locale: string,
   fallback: string
 ) => {
   if (!value) return fallback;
@@ -52,11 +60,11 @@ const formatDate = (
 
   if (Number.isNaN(date.getTime())) return fallback;
 
-  return new Intl.DateTimeFormat(locale, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = String(date.getFullYear()).padStart(4, "0");
+
+  return `${day}.${month}.${year}`;
 };
 
 const getProductImageUrl = (imageUrl?: string | null) => {
@@ -97,8 +105,14 @@ const defaultCreateProductForm = {
   discount: "",
 };
 
+const paymentTypes: Array<{ labelKey: string; value: PaymentType }> = [
+  { labelKey: "products.quickOrder.payment.cash", value: 0 },
+  { labelKey: "products.quickOrder.payment.card", value: 1 },
+];
+
 const Products = () => {
   const theme = useThemeStore((state) => state.theme);
+  const currentUser = useAuthStore((state) => state.user);
   const { t, i18n } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -119,8 +133,25 @@ const Products = () => {
   >([]);
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
   const [productImagePreviewUrl, setProductImagePreviewUrl] = useState("");
+  const [quickOrderProduct, setQuickOrderProduct] = useState<Product | null>(
+    null
+  );
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [isQuickOrderDialogVisible, setIsQuickOrderDialogVisible] =
+    useState(false);
+  const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
+  const [isQuickOrderCreating, setIsQuickOrderCreating] = useState(false);
+  const [isDeletingProduct, setIsDeletingProduct] = useState(false);
+  const [quickOrderErrorMessage, setQuickOrderErrorMessage] = useState("");
+  const [quickOrderQuantity, setQuickOrderQuantity] = useState("1");
+  const [quickOrderPaymentType, setQuickOrderPaymentType] =
+    useState<PaymentType>(0);
   const createDialogAnimationFrameRef = useRef<number | null>(null);
   const createDialogCloseTimerRef = useRef<number | null>(null);
+  const quickOrderDialogAnimationFrameRef = useRef<number | null>(null);
+  const quickOrderDialogCloseTimerRef = useRef<number | null>(null);
+  const deleteDialogAnimationFrameRef = useRef<number | null>(null);
+  const deleteDialogCloseTimerRef = useRef<number | null>(null);
   const isLight = theme === "light";
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
@@ -133,6 +164,7 @@ const Products = () => {
       setProducts(response);
     } catch {
       setErrorMessage("products.loadError");
+      toast.error(t("products.loadError"), { id: "products-load-error" });
     } finally {
       setIsLoading(false);
     }
@@ -148,6 +180,7 @@ const Products = () => {
       .catch(() => {
         if (isActive) {
           setErrorMessage("products.loadError");
+          toast.error(t("products.loadError"), { id: "products-load-error" });
         }
       })
       .finally(() => {
@@ -157,7 +190,7 @@ const Products = () => {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const query = search.trim();
@@ -179,6 +212,22 @@ const Products = () => {
 
       if (createDialogCloseTimerRef.current) {
         window.clearTimeout(createDialogCloseTimerRef.current);
+      }
+
+      if (quickOrderDialogAnimationFrameRef.current) {
+        window.cancelAnimationFrame(quickOrderDialogAnimationFrameRef.current);
+      }
+
+      if (quickOrderDialogCloseTimerRef.current) {
+        window.clearTimeout(quickOrderDialogCloseTimerRef.current);
+      }
+
+      if (deleteDialogAnimationFrameRef.current) {
+        window.cancelAnimationFrame(deleteDialogAnimationFrameRef.current);
+      }
+
+      if (deleteDialogCloseTimerRef.current) {
+        window.clearTimeout(deleteDialogCloseTimerRef.current);
       }
     };
   }, []);
@@ -221,6 +270,7 @@ const Products = () => {
 
     if (!file.type.startsWith("image/")) {
       setCreateErrorMessage("products.create.invalidImage");
+      toast.error(t("products.create.invalidImage"));
       return;
     }
 
@@ -259,6 +309,9 @@ const Products = () => {
       }
     } catch {
       setCreateErrorMessage("productItems.loadError");
+      toast.error(t("productItems.loadError"), {
+        id: "product-items-load-error",
+      });
     } finally {
       setIsProductItemsLoading(false);
     }
@@ -317,6 +370,190 @@ const Products = () => {
     finishCreateDialogClose();
   };
 
+  const openQuickOrderDialog = (product: Product) => {
+    if (quickOrderDialogAnimationFrameRef.current) {
+      window.cancelAnimationFrame(quickOrderDialogAnimationFrameRef.current);
+    }
+
+    if (quickOrderDialogCloseTimerRef.current) {
+      window.clearTimeout(quickOrderDialogCloseTimerRef.current);
+      quickOrderDialogCloseTimerRef.current = null;
+    }
+
+    setQuickOrderProduct(product);
+    setQuickOrderQuantity("1");
+    setQuickOrderPaymentType(0);
+    setQuickOrderErrorMessage("");
+    setIsQuickOrderDialogVisible(false);
+
+    quickOrderDialogAnimationFrameRef.current = window.requestAnimationFrame(
+      () => {
+        setIsQuickOrderDialogVisible(true);
+        quickOrderDialogAnimationFrameRef.current = null;
+      }
+    );
+  };
+
+  const finishQuickOrderDialogClose = () => {
+    if (quickOrderDialogAnimationFrameRef.current) {
+      window.cancelAnimationFrame(quickOrderDialogAnimationFrameRef.current);
+      quickOrderDialogAnimationFrameRef.current = null;
+    }
+
+    if (quickOrderDialogCloseTimerRef.current) {
+      window.clearTimeout(quickOrderDialogCloseTimerRef.current);
+    }
+
+    setIsQuickOrderDialogVisible(false);
+
+    quickOrderDialogCloseTimerRef.current = window.setTimeout(() => {
+      setQuickOrderProduct(null);
+      setQuickOrderQuantity("1");
+      setQuickOrderPaymentType(0);
+      setQuickOrderErrorMessage("");
+      quickOrderDialogCloseTimerRef.current = null;
+    }, 320);
+  };
+
+  const closeQuickOrderDialog = () => {
+    if (isQuickOrderCreating) return;
+
+    finishQuickOrderDialogClose();
+  };
+
+  const openDeleteDialog = (product: Product) => {
+    if (deleteDialogAnimationFrameRef.current) {
+      window.cancelAnimationFrame(deleteDialogAnimationFrameRef.current);
+    }
+
+    if (deleteDialogCloseTimerRef.current) {
+      window.clearTimeout(deleteDialogCloseTimerRef.current);
+      deleteDialogCloseTimerRef.current = null;
+    }
+
+    setProductToDelete(product);
+    setIsDeleteDialogVisible(false);
+
+    deleteDialogAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      setIsDeleteDialogVisible(true);
+      deleteDialogAnimationFrameRef.current = null;
+    });
+  };
+
+  const finishDeleteDialogClose = () => {
+    if (deleteDialogAnimationFrameRef.current) {
+      window.cancelAnimationFrame(deleteDialogAnimationFrameRef.current);
+      deleteDialogAnimationFrameRef.current = null;
+    }
+
+    if (deleteDialogCloseTimerRef.current) {
+      window.clearTimeout(deleteDialogCloseTimerRef.current);
+    }
+
+    setIsDeleteDialogVisible(false);
+
+    deleteDialogCloseTimerRef.current = window.setTimeout(() => {
+      setProductToDelete(null);
+      deleteDialogCloseTimerRef.current = null;
+    }, 320);
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeletingProduct) return;
+
+    finishDeleteDialogClose();
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+
+    setIsDeletingProduct(true);
+
+    try {
+      await deleteProduct(productToDelete.id);
+      const refreshedProducts = await getProducts();
+      setProducts(refreshedProducts);
+      toast.success(t("products.delete.success"));
+      finishDeleteDialogClose();
+    } catch {
+      toast.error(t("products.delete.error"));
+    } finally {
+      setIsDeletingProduct(false);
+    }
+  };
+
+  const handleQuickOrderQuantityChange = (value: string) => {
+    setQuickOrderQuantity(value);
+    setQuickOrderErrorMessage("");
+  };
+
+  const adjustQuickOrderQuantity = (direction: -1 | 1) => {
+    const currentQuantity = Number(quickOrderQuantity);
+    const nextQuantity = Math.max(
+      1,
+      (Number.isFinite(currentQuantity) ? currentQuantity : 1) + direction
+    );
+
+    handleQuickOrderQuantityChange(String(nextQuantity));
+  };
+
+  const quickOrderQuantityValue = Number(quickOrderQuantity);
+  const quickOrderTotal =
+    quickOrderProduct &&
+    Number.isFinite(quickOrderQuantityValue) &&
+    quickOrderQuantityValue > 0
+      ? quickOrderProduct.price * quickOrderQuantityValue
+      : 0;
+
+  const handleCreateQuickOrder = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
+    event.preventDefault();
+
+    if (!quickOrderProduct) return;
+
+    if (!currentUser?.id) {
+      setQuickOrderErrorMessage("products.quickOrder.userMissing");
+      toast.error(t("products.quickOrder.userMissing"));
+      return;
+    }
+
+    if (
+      !Number.isFinite(quickOrderQuantityValue) ||
+      quickOrderQuantityValue <= 0
+    ) {
+      setQuickOrderErrorMessage("products.quickOrder.quantityInvalid");
+      toast.error(t("products.quickOrder.quantityInvalid"));
+      return;
+    }
+
+    setIsQuickOrderCreating(true);
+    setQuickOrderErrorMessage("");
+
+    try {
+      await createOrder({
+        creatorId: currentUser.id,
+        orderItems: [
+          {
+            productId: quickOrderProduct.id,
+            quantity: quickOrderQuantityValue,
+            price: quickOrderProduct.price,
+          },
+        ],
+        totalPrice: quickOrderTotal,
+        paymentType: quickOrderPaymentType,
+      });
+
+      toast.success(t("products.quickOrder.toast.created"));
+      finishQuickOrderDialogClose();
+    } catch {
+      setQuickOrderErrorMessage("products.quickOrder.createError");
+      toast.error(t("products.quickOrder.toast.createError"));
+    } finally {
+      setIsQuickOrderCreating(false);
+    }
+  };
+
   const handleCreateFormChange = (
     field: keyof typeof createForm,
     value: string
@@ -333,6 +570,11 @@ const Products = () => {
     );
 
     handleCreateFormChange(field, String(nextValue));
+  };
+
+  const showCreateError = (messageKey: string) => {
+    setCreateErrorMessage(messageKey);
+    toast.error(t(messageKey));
   };
 
   const handleProductItemDraftChange = (
@@ -363,7 +605,7 @@ const Products = () => {
     const firstProductItem = availableProductItems[0];
 
     if (!firstProductItem) {
-      setCreateErrorMessage("products.create.noProductItemsAvailable");
+      showCreateError("products.create.noProductItemsAvailable");
       return;
     }
 
@@ -398,22 +640,22 @@ const Products = () => {
     }));
 
     if (!name) {
-      setCreateErrorMessage("products.create.nameRequired");
+      showCreateError("products.create.nameRequired");
       return;
     }
 
     if (!productImageFile) {
-      setCreateErrorMessage("products.create.imageRequired");
+      showCreateError("products.create.imageRequired");
       return;
     }
 
     if (!createForm.price.trim() || !Number.isFinite(price) || price < 0) {
-      setCreateErrorMessage("products.create.priceInvalid");
+      showCreateError("products.create.priceInvalid");
       return;
     }
 
     if (!Number.isFinite(discount) || discount < 0) {
-      setCreateErrorMessage("products.create.discountInvalid");
+      showCreateError("products.create.discountInvalid");
       return;
     }
 
@@ -426,7 +668,7 @@ const Products = () => {
           item.quantity <= 0
       )
     ) {
-      setCreateErrorMessage("products.create.productItemsInvalid");
+      showCreateError("products.create.productItemsInvalid");
       return;
     }
 
@@ -447,9 +689,11 @@ const Products = () => {
 
       const refreshedProducts = await getProducts();
       setProducts(refreshedProducts);
+      toast.success(t("products.create.created"));
       finishCreateDialogClose();
     } catch {
       setCreateErrorMessage("products.create.createError");
+      toast.error(t("products.create.createError"));
     } finally {
       setIsCreating(false);
     }
@@ -876,7 +1120,7 @@ const Products = () => {
                               isLight ? "text-gray-500" : "text-gray-400"
                             }`}
                           >
-                            <Sparkles size={16} className="text-red-500" />
+                            <Boxes size={16} className="text-red-500" />
                             {t("products.itemsTotal")}
                           </span>
                           <span className="font-black">
@@ -898,11 +1142,41 @@ const Products = () => {
                           </span>
                           <span className="font-bold">
                             {formatDate(
-                              product.updatedAt,
-                              locale,
+                              product.createdAt,
                               t("common.notAvailable")
                             )}
                           </span>
+                        </div>
+
+                        <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={() => openQuickOrderDialog(product)}
+                            aria-label={t("products.quickOrder.createFor", {
+                              product:
+                                product.name || t("common.unnamedProduct"),
+                            })}
+                            className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-500/25 active:scale-95"
+                          >
+                            <ShoppingCart size={17} strokeWidth={2.7} />
+                            <span>{t("products.quickOrder.cardAction")}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openDeleteDialog(product)}
+                            aria-label={t("products.delete.aria", {
+                              product:
+                                product.name || t("common.unnamedProduct"),
+                            })}
+                            className={`flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-black transition-all duration-200 hover:cursor-pointer ${
+                              isLight
+                                ? "border-red-200 bg-white text-red-600 hover:border-red-300 hover:bg-red-50"
+                                : "border-red-400/40 bg-gray-800 text-red-200 hover:border-red-300 hover:bg-red-500/15"
+                            }`}
+                          >
+                            <Trash2 size={17} strokeWidth={2.7} />
+                            <span>{t("products.delete.button")}</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -913,6 +1187,375 @@ const Products = () => {
           )}
         </div>
       </section>
+
+      {productToDelete && (
+        <div
+          aria-hidden={!isDeleteDialogVisible}
+          className={`fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/45 px-4 py-5 backdrop-blur-[2px] transition-all duration-300 ease-out sm:items-center ${
+            isDeleteDialogVisible
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
+          }`}
+          onClick={closeDeleteDialog}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-product-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+            className={`w-full max-w-md overflow-hidden rounded-2xl border p-5 shadow-2xl transition-all duration-300 ease-out sm:p-6 ${
+              isDeleteDialogVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-5 scale-95 opacity-0 sm:translate-y-3"
+            } ${
+              isLight
+                ? "border-gray-200 bg-white text-gray-900 shadow-gray-950/15"
+                : "border-gray-700 bg-gray-800 text-white shadow-black/35"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white shadow-md shadow-red-950/20">
+                <Trash2 size={22} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-red-500">
+                  {t("products.delete.eyebrow")}
+                </p>
+                <h2 id="delete-product-dialog-title" className="mt-1 text-xl font-black">
+                  {t("products.delete.title")}
+                </h2>
+                <p
+                  className={`mt-2 text-sm font-semibold ${
+                    isLight ? "text-gray-500" : "text-gray-400"
+                  }`}
+                >
+                  {t("products.delete.message", {
+                    product:
+                      productToDelete.name || t("common.unnamedProduct"),
+                  })}
+                </p>
+              </div>
+            </div>
+
+            <div
+              className={`mt-5 flex flex-col-reverse gap-3 border-t pt-4 sm:flex-row sm:justify-end ${
+                isLight ? "border-gray-200" : "border-gray-700"
+              }`}
+            >
+              <button
+                type="button"
+                onClick={closeDeleteDialog}
+                disabled={isDeletingProduct}
+                className={`h-11 rounded-xl border px-5 font-bold transition-all duration-200 hover:cursor-pointer active:scale-98 disabled:cursor-not-allowed disabled:opacity-60 ${
+                  isLight
+                    ? "border-gray-200 bg-white hover:bg-gray-100"
+                    : "border-gray-700 bg-gray-900 hover:bg-gray-700"
+                }`}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteProduct()}
+                disabled={isDeletingProduct}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-98 disabled:cursor-not-allowed disabled:bg-red-300"
+              >
+                {isDeletingProduct && (
+                  <LoaderCircle size={17} className="animate-spin" />
+                )}
+                {isDeletingProduct
+                  ? t("products.delete.deleting")
+                  : t("products.delete.confirm")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {quickOrderProduct && (
+        <div
+          aria-hidden={!isQuickOrderDialogVisible}
+          className={`fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/45 px-4 py-5 backdrop-blur-[2px] transition-all duration-300 ease-out sm:items-center ${
+            isQuickOrderDialogVisible
+              ? "pointer-events-auto opacity-100"
+              : "pointer-events-none opacity-0"
+          }`}
+          onClick={closeQuickOrderDialog}
+        >
+          <section
+            className={`w-full max-w-xl overflow-hidden rounded-2xl border shadow-2xl transition-all duration-300 ease-out ${
+              isQuickOrderDialogVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-5 scale-95 opacity-0 sm:translate-y-3"
+            } ${
+              isLight
+                ? "border-gray-200 bg-white text-gray-900 shadow-gray-950/15"
+                : "border-gray-700 bg-gray-800 text-white shadow-black/35"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="h-1.5 bg-red-500" />
+
+            <div className="max-h-[calc(100vh-52px)] overflow-y-auto p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-12 items-center justify-center rounded-xl bg-red-500 text-white shadow-md shadow-red-950/20">
+                    <ShoppingCart size={21} />
+                  </span>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-red-500">
+                      {t("products.quickOrder.eyebrow")}
+                    </p>
+                    <h2 className="text-xl font-black">
+                      {t("products.quickOrder.title")}
+                    </h2>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeQuickOrderDialog}
+                  aria-label={t("products.quickOrder.closeAria")}
+                  disabled={isQuickOrderCreating}
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-full border transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isLight
+                      ? "border-gray-200 hover:bg-gray-100"
+                      : "border-gray-700 hover:bg-gray-700"
+                  }`}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateQuickOrder} className="mt-6 grid gap-4">
+                <section
+                  className={`grid gap-3 rounded-xl border p-3 transition-colors duration-200 sm:grid-cols-[96px_minmax(0,1fr)] ${
+                    isLight
+                      ? "border-gray-200 bg-gray-50"
+                      : "border-gray-700 bg-gray-900"
+                  }`}
+                >
+                  <div
+                    className={`relative aspect-square overflow-hidden rounded-xl ${
+                      isLight ? "bg-gray-100" : "bg-gray-800"
+                    }`}
+                  >
+                    {getProductImageUrl(quickOrderProduct.imageUrl) ? (
+                      <img
+                        src={getProductImageUrl(quickOrderProduct.imageUrl)}
+                        alt={quickOrderProduct.name || t("common.productAlt")}
+                        className="size-full object-cover"
+                        onError={(event) => {
+                          event.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className={`flex size-full items-center justify-center ${
+                          isLight ? "text-gray-300" : "text-gray-600"
+                        }`}
+                      >
+                        <ImageOff size={28} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="truncate text-lg font-black">
+                      {quickOrderProduct.name || t("common.unnamedProduct")}
+                    </h3>
+                    <p
+                      className={`mt-1 line-clamp-2 text-sm font-semibold ${
+                        isLight ? "text-gray-500" : "text-gray-400"
+                      }`}
+                    >
+                      {quickOrderProduct.description || t("common.noDescription")}
+                    </p>
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      <span className="rounded-lg bg-red-500 px-3 py-2 text-sm font-black text-white shadow-sm shadow-red-950/15">
+                        {formatCurrency(quickOrderProduct.price, locale)}
+                      </span>
+                      {quickOrderProduct.discount > 0 && (
+                        <span
+                          className={`rounded-lg border px-3 py-2 text-xs font-black ${
+                            isLight
+                              ? "border-amber-300 bg-amber-50 text-red-700"
+                              : "border-amber-300/50 bg-amber-300/10 text-amber-100"
+                          }`}
+                        >
+                          {formatDiscount(quickOrderProduct.discount, locale, t)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </section>
+
+                <section
+                  className={`rounded-xl border p-3 transition-colors duration-200 ${
+                    isLight
+                      ? "border-gray-200 bg-gray-50"
+                      : "border-gray-700 bg-gray-900"
+                  }`}
+                >
+                  <div
+                    className={`flex items-center gap-2 text-xs font-black uppercase tracking-wide ${
+                      isLight ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    <Package size={15} className="text-red-500" />
+                    {t("products.quickOrder.quantity")}
+                  </div>
+
+                  <div
+                    className={`mt-3 flex h-12 overflow-hidden rounded-xl border ${
+                      isLight
+                        ? "border-gray-200 bg-white"
+                        : "border-gray-700 bg-gray-800"
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => adjustQuickOrderQuantity(-1)}
+                      disabled={isQuickOrderCreating}
+                      aria-label={t("products.quickOrder.decreaseQuantity")}
+                      className={`flex w-12 shrink-0 items-center justify-center border-r transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isLight
+                          ? "border-gray-200 text-gray-600 hover:bg-red-50 hover:text-red-600"
+                          : "border-gray-700 text-gray-300 hover:bg-red-500/15 hover:text-red-200"
+                      }`}
+                    >
+                      <Minus size={18} strokeWidth={2.7} />
+                    </button>
+
+                    <input
+                      type="number"
+                      value={quickOrderQuantity}
+                      onChange={(event) =>
+                        handleQuickOrderQuantityChange(event.target.value)
+                      }
+                      min="1"
+                      step="1"
+                      disabled={isQuickOrderCreating}
+                      className={`h-full min-w-0 flex-1 bg-transparent px-2 text-center text-base font-black outline-none [appearance:textfield] disabled:cursor-not-allowed disabled:opacity-60 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
+                        isLight
+                          ? "placeholder:text-gray-300"
+                          : "placeholder:text-gray-600"
+                      }`}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => adjustQuickOrderQuantity(1)}
+                      disabled={isQuickOrderCreating}
+                      aria-label={t("products.quickOrder.increaseQuantity")}
+                      className="flex w-12 shrink-0 items-center justify-center bg-red-500 text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                    >
+                      <Plus size={18} strokeWidth={2.7} />
+                    </button>
+                  </div>
+                </section>
+
+                <section
+                  className={`rounded-xl border p-3 transition-colors duration-200 ${
+                    isLight
+                      ? "border-gray-200 bg-gray-50"
+                      : "border-gray-700 bg-gray-900"
+                  }`}
+                >
+                  <div
+                    className={`flex items-center gap-2 text-xs font-black uppercase tracking-wide ${
+                      isLight ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    <CreditCard size={15} className="text-red-500" />
+                    {t("products.quickOrder.payment.label")}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {paymentTypes.map(({ labelKey, value }) => {
+                      const isActive = quickOrderPaymentType === value;
+
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setQuickOrderPaymentType(value)}
+                          disabled={isQuickOrderCreating}
+                          className={`h-11 rounded-xl border px-2 text-sm font-black transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                            isActive
+                              ? "border-red-500 bg-red-500 text-white shadow-md shadow-red-950/15"
+                              : isLight
+                              ? "border-gray-200 bg-white text-gray-600 hover:border-amber-300 hover:bg-amber-50 hover:text-red-600"
+                              : "border-gray-700 bg-gray-800 text-gray-300 hover:border-amber-300 hover:bg-gray-700 hover:text-amber-100"
+                          }`}
+                        >
+                          {t(labelKey)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <div
+                  className={`flex items-center justify-between rounded-xl border px-4 py-3 ${
+                    isLight
+                      ? "border-gray-200 bg-white"
+                      : "border-gray-700 bg-gray-900"
+                  }`}
+                >
+                  <span
+                    className={`text-sm font-black uppercase tracking-wide ${
+                      isLight ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    {t("products.quickOrder.total")}
+                  </span>
+                  <span className="text-xl font-black">
+                    {formatCurrency(quickOrderTotal, locale)}
+                  </span>
+                </div>
+
+                <p
+                  className={`min-h-5 text-sm font-bold transition-all duration-200 ${
+                    quickOrderErrorMessage
+                      ? "translate-y-0 text-red-500 opacity-100"
+                      : "-translate-y-1 opacity-0"
+                  }`}
+                >
+                  {quickOrderErrorMessage
+                    ? t(quickOrderErrorMessage)
+                    : t("common.ready")}
+                </p>
+
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={closeQuickOrderDialog}
+                    disabled={isQuickOrderCreating}
+                    className={`h-11 rounded-lg border px-4 font-bold transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                      isLight
+                        ? "border-gray-200 bg-white text-gray-700 hover:bg-gray-100"
+                        : "border-gray-700 bg-gray-900 text-gray-200 hover:bg-gray-700"
+                    }`}
+                  >
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isQuickOrderCreating}
+                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isQuickOrderCreating && (
+                      <LoaderCircle size={17} className="animate-spin" />
+                    )}
+                    {t("products.quickOrder.submit")}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
+      )}
 
       {isCreateDialogOpen && (
         <div
@@ -1201,7 +1844,7 @@ const Products = () => {
                               : "border-gray-700 bg-gray-800"
                           }`}
                         >
-                          <label className="grid gap-1.5">
+                          <div className="grid gap-1.5">
                             <span
                               className={`text-xs font-black uppercase tracking-wide ${
                                 isLight ? "text-gray-500" : "text-gray-400"
@@ -1235,9 +1878,9 @@ const Products = () => {
                                 </option>
                               ))}
                             </select>
-                          </label>
+                          </div>
 
-                          <label className="grid gap-1.5">
+                          <div className="grid gap-1.5">
                             <span
                               className={`text-xs font-black uppercase tracking-wide ${
                                 isLight ? "text-gray-500" : "text-gray-400"
@@ -1257,12 +1900,16 @@ const Products = () => {
                                 onClick={() =>
                                   adjustProductItemQuantity(index, -1)
                                 }
-                                disabled={isCreating}
+                                disabled={
+                                  isCreating ||
+                                  !Number.isFinite(Number(draft.quantity)) ||
+                                  Number(draft.quantity) <= 0
+                                }
                                 aria-label={t("products.create.decreaseQuantity")}
-                                className={`flex w-11 shrink-0 items-center justify-center border-r transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                                className={`flex w-11 shrink-0 items-center justify-center border-r transition-all duration-200 enabled:hover:cursor-pointer enabled:active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${
                                   isLight
-                                    ? "border-gray-200 text-gray-600 hover:bg-red-50 hover:text-red-600"
-                                    : "border-gray-700 text-gray-300 hover:bg-red-500/15 hover:text-red-200"
+                                    ? "border-gray-200 text-gray-600 enabled:hover:bg-red-50 enabled:hover:text-red-600"
+                                    : "border-gray-700 text-gray-300 enabled:hover:bg-red-500/15 enabled:hover:text-red-200"
                                 }`}
                               >
                                 <Minus size={17} strokeWidth={2.7} />
@@ -1272,6 +1919,7 @@ const Products = () => {
                                 min="0"
                                 step="any"
                                 value={draft.quantity}
+                                aria-label={t("products.create.quantity")}
                                 onChange={(event) =>
                                   handleProductItemDraftChange(
                                     index,
@@ -1298,12 +1946,12 @@ const Products = () => {
                                 <Plus size={17} strokeWidth={2.7} />
                               </button>
                             </div>
-                          </label>
+                          </div>
 
                           <button
                             type="button"
                             onClick={() => removeProductItemDraft(index)}
-                            disabled={isCreating || productItemDrafts.length === 1}
+                            disabled={isCreating}
                             aria-label={t("products.create.removeItem")}
                             className={`flex h-11 items-center justify-center rounded-xl border transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-45 ${
                               isLight

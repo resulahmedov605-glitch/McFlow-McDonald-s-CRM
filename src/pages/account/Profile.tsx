@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 import { useNavigate } from "react-router";
 import useAuthStore from "../../store/authStore";
 import { useThemeStore } from "../../store/useThemeStore";
@@ -128,6 +129,7 @@ const Profile = () => {
     localStorage.removeItem("mcflow_access_token");
     localStorage.removeItem("mcflow_refresh_token");
     setUser(null);
+    toast.success(t("profile.toast.loggedOut"));
     navigate("/login", { replace: true });
   };
 
