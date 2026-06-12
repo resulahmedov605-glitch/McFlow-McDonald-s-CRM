@@ -21,6 +21,7 @@ export type MeResponse = {
   username: string;
   email: string;
   role: string;
+  imageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   loginedAt: string;

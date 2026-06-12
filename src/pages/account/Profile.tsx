@@ -15,6 +15,7 @@ import {
 import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router";
+import { getProfilePictureUrl } from "../../lib/profilePicture";
 import useAuthStore from "../../store/authStore";
 import { useThemeStore } from "../../store/useThemeStore";
 
@@ -116,6 +117,7 @@ const Profile = () => {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
   const [isLogoutDialogOpen, setIsLogoutDialogOpen] = useState(false);
+  const [brokenProfilePictureUrl, setBrokenProfilePictureUrl] = useState("");
   const isLight = theme === "light";
   const roleProfile =
     roleProfiles[normalizeRole(user?.role)] ?? roleProfiles.untrusted;
@@ -124,6 +126,11 @@ const Profile = () => {
   const roleLabel = t(roleProfile.labelKey);
   const roleDescription = t(roleProfile.descriptionKey);
   const roleTooltipId = "profile-role-tooltip";
+  const profilePictureUrl = getProfilePictureUrl(user, user?.updatedAt);
+  const shouldShowProfilePicture =
+    profilePictureUrl && profilePictureUrl !== brokenProfilePictureUrl;
+  const profileDisplayName =
+    user?.fullName || user?.username || t("profile.fallbackTitle");
 
   const handleLogout = () => {
     localStorage.removeItem("mcflow_access_token");
@@ -252,9 +259,21 @@ const Profile = () => {
           <div className="mt-4 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 flex-col gap-5 sm:flex-row sm:items-center">
               <div
-                className={`flex size-24 shrink-0 items-center justify-center rounded-2xl text-3xl font-black text-white shadow-lg shadow-gray-950/15 ${roleProfile.accentBg}`}
+                className={`flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl text-3xl font-black text-white shadow-lg shadow-gray-950/15 ${
+                  shouldShowProfilePicture ? "bg-transparent" : roleProfile.accentBg
+                }`}
               >
-                {getInitials(user?.fullName, user?.username)}
+                {shouldShowProfilePicture ? (
+                  <img
+                    key={profilePictureUrl}
+                    src={profilePictureUrl}
+                    alt={profileDisplayName}
+                    className="size-full object-cover"
+                    onError={() => setBrokenProfilePictureUrl(profilePictureUrl)}
+                  />
+                ) : (
+                  getInitials(user?.fullName, user?.username)
+                )}
               </div>
 
               <div className="min-w-0">
