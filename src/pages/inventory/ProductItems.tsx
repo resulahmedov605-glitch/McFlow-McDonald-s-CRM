@@ -11,6 +11,7 @@ import {
   Ruler,
   Search,
   SlidersHorizontal,
+  Trash2,
   Warehouse,
   X,
   type LucideIcon,
@@ -20,6 +21,7 @@ import toast from "react-hot-toast";
 
 import {
   createProductItem,
+  deleteProductItem,
   getProductItems,
   type ProductItem,
   type UnitType,
@@ -106,10 +108,16 @@ const ProductItems = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreateDialogVisible, setIsCreateDialogVisible] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [productItemToDelete, setProductItemToDelete] =
+    useState<ProductItem | null>(null);
+  const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
+  const [isDeletingProductItem, setIsDeletingProductItem] = useState(false);
   const [createErrorMessage, setCreateErrorMessage] = useState("");
   const [createForm, setCreateForm] = useState(defaultCreateForm);
   const createDialogAnimationFrameRef = useRef<number | null>(null);
   const createDialogCloseTimerRef = useRef<number | null>(null);
+  const deleteDialogAnimationFrameRef = useRef<number | null>(null);
+  const deleteDialogCloseTimerRef = useRef<number | null>(null);
   const isLight = theme === "light";
   const locale = i18n.resolvedLanguage ?? i18n.language;
 
@@ -175,6 +183,14 @@ const ProductItems = () => {
       if (createDialogCloseTimerRef.current) {
         window.clearTimeout(createDialogCloseTimerRef.current);
       }
+
+      if (deleteDialogAnimationFrameRef.current) {
+        window.cancelAnimationFrame(deleteDialogAnimationFrameRef.current);
+      }
+
+      if (deleteDialogCloseTimerRef.current) {
+        window.clearTimeout(deleteDialogCloseTimerRef.current);
+      }
     };
   }, []);
 
@@ -239,6 +255,49 @@ const ProductItems = () => {
     if (isCreating) return;
 
     finishCreateDialogClose();
+  };
+
+  const openDeleteDialog = (item: ProductItem) => {
+    if (deleteDialogAnimationFrameRef.current) {
+      window.cancelAnimationFrame(deleteDialogAnimationFrameRef.current);
+    }
+
+    if (deleteDialogCloseTimerRef.current) {
+      window.clearTimeout(deleteDialogCloseTimerRef.current);
+      deleteDialogCloseTimerRef.current = null;
+    }
+
+    setProductItemToDelete(item);
+    setIsDeleteDialogVisible(false);
+
+    deleteDialogAnimationFrameRef.current = window.requestAnimationFrame(() => {
+      setIsDeleteDialogVisible(true);
+      deleteDialogAnimationFrameRef.current = null;
+    });
+  };
+
+  const finishDeleteDialogClose = () => {
+    if (deleteDialogAnimationFrameRef.current) {
+      window.cancelAnimationFrame(deleteDialogAnimationFrameRef.current);
+      deleteDialogAnimationFrameRef.current = null;
+    }
+
+    if (deleteDialogCloseTimerRef.current) {
+      window.clearTimeout(deleteDialogCloseTimerRef.current);
+    }
+
+    setIsDeleteDialogVisible(false);
+
+    deleteDialogCloseTimerRef.current = window.setTimeout(() => {
+      setProductItemToDelete(null);
+      deleteDialogCloseTimerRef.current = null;
+    }, 320);
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeletingProductItem) return;
+
+    finishDeleteDialogClose();
   };
 
   const handleCreateFormChange = (
@@ -314,6 +373,25 @@ const ProductItems = () => {
       toast.error(t("productItems.create.createError"));
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleDeleteProductItem = async () => {
+    if (!productItemToDelete) return;
+
+    setIsDeletingProductItem(true);
+
+    try {
+      await deleteProductItem(productItemToDelete.id);
+      setProductItems((currentItems) =>
+        currentItems.filter((item) => item.id !== productItemToDelete.id)
+      );
+      toast.success(t("productItems.delete.success"));
+      finishDeleteDialogClose();
+    } catch {
+      toast.error(t("productItems.delete.error"));
+    } finally {
+      setIsDeletingProductItem(false);
     }
   };
 
@@ -747,7 +825,7 @@ const ProductItems = () => {
                 type="button"
                 onClick={openCreateDialog}
                 aria-label={t("productItems.createAria")}
-                className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95"
+                className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-500/25 active:scale-95"
               >
                 <Plus size={21} strokeWidth={2.7} />
                 <span>{t("productItems.newItem")}</span>
@@ -801,7 +879,7 @@ const ProductItems = () => {
                 return (
                   <article
                     key={item.id}
-                    className={`relative overflow-hidden rounded-xl border p-4 pl-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 lg:grid lg:grid-cols-[minmax(0,1.5fr)_minmax(160px,0.75fr)_minmax(160px,0.75fr)_minmax(160px,0.75fr)] lg:items-center ${
+                    className={`relative overflow-hidden rounded-xl border p-4 pl-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 lg:grid lg:grid-cols-[minmax(0,1.5fr)_minmax(160px,0.75fr)_minmax(160px,0.75fr)_minmax(160px,0.75fr)_56px] lg:items-center ${
                       isLight
                         ? "border-gray-200 bg-gray-50 hover:border-amber-300 hover:bg-white hover:shadow-gray-900/10"
                         : "border-gray-700 bg-gray-900 hover:border-amber-300 hover:bg-gray-800 hover:shadow-black/30"
@@ -831,20 +909,32 @@ const ProductItems = () => {
                           </p>
                         </div>
                       </div>
-                      <span
-                        className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-black lg:hidden ${
-                          isLight
-                            ? "border-amber-300 bg-amber-50 text-amber-800"
-                            : "border-amber-300/50 bg-amber-400/15 text-amber-100"
-                        }`}
-                      >
-                        <Ruler size={15} />
-                        {item.unit
-                          ? t(`units.${item.unit}`, {
-                              defaultValue: item.unit,
-                            })
-                          : t("productItems.noUnit")}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-2 lg:hidden">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-black ${
+                            isLight
+                              ? "border-amber-300 bg-amber-50 text-amber-800"
+                              : "border-amber-300/50 bg-amber-400/15 text-amber-100"
+                          }`}
+                        >
+                          <Ruler size={15} />
+                          {item.unit
+                            ? t(`units.${item.unit}`, {
+                                defaultValue: item.unit,
+                              })
+                            : t("productItems.noUnit")}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => openDeleteDialog(item)}
+                          aria-label={t("productItems.delete.aria", {
+                            item: item.name || t("common.unnamedItem"),
+                          })}
+                          className="flex size-10 items-center justify-center rounded-xl border border-red-300 bg-transparent text-red-500 transition-all duration-200 ease-out hover:cursor-pointer hover:bg-red-500 hover:text-white hover:shadow-md hover:shadow-red-950/20 active:scale-90"
+                        >
+                          <Trash2 size={17} strokeWidth={2.5} />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-4 grid gap-2 sm:grid-cols-3 lg:contents">
@@ -907,6 +997,17 @@ const ProductItems = () => {
                         </p>
                       </div>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => openDeleteDialog(item)}
+                      aria-label={t("productItems.delete.aria", {
+                        item: item.name || t("common.unnamedItem"),
+                      })}
+                      className="ml-auto hidden h-full min-h-[58px] w-12 items-center justify-center rounded-xl border border-red-300 bg-transparent text-red-500 transition-all duration-200 ease-out hover:cursor-pointer hover:bg-red-500 hover:text-white hover:shadow-md hover:shadow-red-950/20 active:scale-90 lg:flex"
+                    >
+                      <Trash2 size={18} strokeWidth={2.5} />
+                    </button>
                   </article>
                 );
               })}
@@ -914,6 +1015,150 @@ const ProductItems = () => {
           )}
         </div>
       </section>
+
+      {productItemToDelete && (
+        <div
+          role="presentation"
+          onClick={closeDeleteDialog}
+          className={`fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 px-4 py-5 transition-all duration-300 ease-out sm:items-center ${
+            isDeleteDialogVisible
+              ? "pointer-events-auto opacity-100 backdrop-blur-[3px]"
+              : "pointer-events-none opacity-0 backdrop-blur-0"
+          }`}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-product-item-dialog-title"
+            className={`w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl ring-1 transition-all duration-300 ease-out ${
+              isDeleteDialogVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-5 scale-95 opacity-0 sm:translate-y-3"
+            } ${
+              isLight
+                ? "border-amber-300 bg-white text-gray-900 shadow-amber-950/10 ring-amber-300"
+                : "border-amber-300/70 bg-gray-800 text-white shadow-black/35 ring-amber-300/70"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="h-1.5 bg-red-500" />
+
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start gap-3">
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white shadow-md shadow-red-950/20">
+                  <Trash2 size={22} />
+                </span>
+                <div className="min-w-0">
+                  <p
+                    className={`text-xs font-black uppercase ${
+                      isLight ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    {t("productItems.delete.eyebrow")}
+                  </p>
+                  <h2
+                    id="delete-product-item-dialog-title"
+                    className="mt-1 text-2xl font-black"
+                  >
+                    {t("productItems.delete.title")}
+                  </h2>
+                </div>
+              </div>
+
+              <p
+                className={`mt-5 text-sm font-semibold leading-6 ${
+                  isLight ? "text-gray-600" : "text-gray-300"
+                }`}
+              >
+                {t("productItems.delete.message", {
+                  item: productItemToDelete.name || t("common.unnamedItem"),
+                })}
+              </p>
+
+              <div
+                className={`mt-4 rounded-xl border p-3 ${
+                  isLight
+                    ? "border-gray-200 bg-gray-50"
+                    : "border-gray-700 bg-gray-900"
+                }`}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-black">
+                      {productItemToDelete.name || t("common.unnamedItem")}
+                    </p>
+                    <p
+                      className={`mt-1 inline-flex items-center gap-1.5 text-sm font-semibold ${
+                        isLight ? "text-gray-500" : "text-gray-400"
+                      }`}
+                    >
+                      <Ruler size={14} className="text-red-500" />
+                      {productItemToDelete.unit
+                        ? t(`units.${productItemToDelete.unit}`, {
+                            defaultValue: productItemToDelete.unit,
+                          })
+                        : t("productItems.noUnit")}
+                    </p>
+                  </div>
+                  <span
+                    className={`inline-flex min-h-10 shrink-0 items-center rounded-xl border px-3 text-sm font-black ${getStockStyle(
+                      productItemToDelete.stock,
+                      isLight
+                    )}`}
+                  >
+                    {formatNumber(productItemToDelete.stock, locale)}
+                  </span>
+                </div>
+
+                <div
+                  className={`mt-3 flex items-center justify-between rounded-lg border px-3 py-2 text-sm font-semibold ${
+                    isLight
+                      ? "border-gray-200 bg-white text-gray-600"
+                      : "border-gray-700 bg-gray-800 text-gray-300"
+                  }`}
+                >
+                  <span>{t("productItems.totalValue")}</span>
+                  <span className="font-black">
+                    {formatCurrency(
+                      (productItemToDelete.pricePerUnit || 0) *
+                        (productItemToDelete.stock || 0),
+                      locale
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeDeleteDialog}
+                  disabled={isDeletingProductItem}
+                  className={`h-11 rounded-xl border px-5 font-bold transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isLight
+                      ? "border-gray-200 bg-white hover:bg-gray-100"
+                      : "border-gray-700 bg-gray-900 hover:bg-gray-700"
+                  }`}
+                >
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteProductItem()}
+                  disabled={isDeletingProductItem}
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-950/20 active:scale-95 disabled:cursor-not-allowed disabled:bg-red-300 disabled:text-white disabled:shadow-red-950/20"
+                >
+                  {isDeletingProductItem && (
+                    <LoaderCircle size={17} className="animate-spin" />
+                  )}
+                  {isDeletingProductItem
+                    ? t("productItems.delete.deleting")
+                    : t("productItems.delete.confirm")}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
 
       {isCreateDialogOpen && (
         <div
@@ -1087,7 +1332,7 @@ const ProductItems = () => {
                   <button
                     type="submit"
                     disabled={isCreating}
-                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-red-500 disabled:hover:text-white"
                   >
                     {isCreating && (
                       <LoaderCircle size={17} className="animate-spin" />

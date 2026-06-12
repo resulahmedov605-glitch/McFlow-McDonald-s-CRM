@@ -28,6 +28,10 @@ export const getProductItems = async (): Promise<ProductItem[]> => {
   return response.data;
 };
 
+export const deleteProductItem = async (id: string): Promise<void> => {
+  await api.delete(`/api/ProductItems/${id}`);
+};
+
 export const createProductItem = async (
   request: CreateProductItemRequest
 ): Promise<void> => {

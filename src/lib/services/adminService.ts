@@ -29,6 +29,11 @@ export const createUser = async (userData: AdminCreateUser) => {
   return response.data;
 };
 
+export const deleteUser = async (userId: string) => {
+  const response = await api.delete(`/api/Admin/users/${userId}`);
+  return response.data;
+};
+
 export const changeUserProfilePic = async (userId: string, formFile: File) => {
   const formData = new FormData();
   formData.append("file", formFile, formFile.name);

@@ -998,7 +998,7 @@ const Products = () => {
                 type="button"
                 onClick={openCreateDialog}
                 aria-label={t("products.createAria")}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-500/25 active:scale-95"
               >
                 <Plus size={21} strokeWidth={2.7} />
                 <span>{t("products.newProduct")}</span>
@@ -1258,7 +1258,7 @@ const Products = () => {
                 type="button"
                 onClick={() => void handleDeleteProduct()}
                 disabled={isDeletingProduct}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-98 disabled:cursor-not-allowed disabled:bg-red-300"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-500/25 active:scale-98 disabled:cursor-not-allowed disabled:bg-red-300 disabled:text-white disabled:shadow-red-950/20"
               >
                 {isDeletingProduct && (
                   <LoaderCircle size={17} className="animate-spin" />
@@ -1543,7 +1543,7 @@ const Products = () => {
                   <button
                     type="submit"
                     disabled={isQuickOrderCreating}
-                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-red-500 disabled:hover:text-white"
                   >
                     {isQuickOrderCreating && (
                       <LoaderCircle size={17} className="animate-spin" />
@@ -1803,7 +1803,7 @@ const Products = () => {
                       type="button"
                       onClick={addProductItemDraft}
                       disabled={isCreating || isProductItemsLoading}
-                      className="flex h-10 items-center justify-center gap-2 rounded-xl bg-red-500 px-3 text-sm font-black text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                      className="flex h-10 items-center justify-center gap-2 rounded-xl bg-red-500 px-3 text-sm font-black text-white transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-red-500 disabled:hover:text-white"
                     >
                       <Plus size={17} strokeWidth={2.7} />
                       {t("products.create.addItem")}
@@ -1993,7 +1993,7 @@ const Products = () => {
                   <button
                     type="submit"
                     disabled={isCreating || isProductItemsLoading}
-                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-red-500 disabled:hover:text-white"
                   >
                     {isCreating && (
                       <LoaderCircle size={17} className="animate-spin" />

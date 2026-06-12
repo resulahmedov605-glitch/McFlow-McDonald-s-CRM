@@ -838,7 +838,7 @@ const Orders = () => {
                 type="button"
                 onClick={openCreateDialog}
                 aria-label={t("orders.createAria")}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-500/25 active:scale-95"
               >
                 <Plus size={21} strokeWidth={2.7} />
                 <span>{t("orders.newOrder")}</span>
@@ -1352,7 +1352,7 @@ const Orders = () => {
                       type="button"
                       onClick={addOrderItemDraft}
                       disabled={isCreating}
-                      className="flex h-10 items-center justify-center gap-2 rounded-xl bg-red-500 px-3 text-sm font-black text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                      className="flex h-10 items-center justify-center gap-2 rounded-xl bg-red-500 px-3 text-sm font-black text-white transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-red-500 disabled:hover:text-white"
                     >
                       <Plus size={17} strokeWidth={2.7} />
                       {t("orders.create.addProduct")}
@@ -1557,7 +1557,7 @@ const Orders = () => {
                   <button
                     type="submit"
                     disabled={isCreating}
-                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-red-500 px-4 font-bold text-white transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:bg-red-500 disabled:hover:text-white"
                   >
                     {isCreating && (
                       <LoaderCircle size={17} className="animate-spin" />

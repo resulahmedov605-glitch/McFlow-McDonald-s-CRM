@@ -5,6 +5,8 @@ import {
   ChevronDown,
   CircleHelp,
   Clock3,
+  Eye,
+  EyeOff,
   HardHat,
   ImagePlus,
   LockKeyhole,
@@ -31,6 +33,7 @@ import toast from "react-hot-toast";
 import {
   changeUserProfilePic,
   createUser,
+  deleteUser,
   getUsers,
   type AdminUser,
 } from "../../lib/services/adminService";
@@ -119,11 +122,27 @@ const getInitials = (fullName?: string | null, username?: string | null) => {
     .join("");
 };
 
+const getUserDisplayName = (user?: AdminUser | null) =>
+  user?.fullName?.trim() || user?.username?.trim() || user?.email?.trim() || "";
+
+const formatLastLogin = (
+  value: string | null | undefined,
+  locale: string,
+  t: (key: string, options?: Record<string, unknown>) => string
+) => {
+  if (!value) return t("employee.neverLoggedIn");
+
+  return t("employee.lastLogin", {
+    date: formatDate(value, locale, t("employee.neverLoggedIn")),
+  });
+};
+
 const defaultCreateUserForm = {
   fullName: "",
   username: "",
   email: "",
   password: "",
+  confirmPassword: "",
 };
 
 type CreateUserForm = typeof defaultCreateUserForm;
@@ -149,13 +168,21 @@ const Employee = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreateDialogVisible, setIsCreateDialogVisible] = useState(false);
   const [isPhotoDialogVisible, setIsPhotoDialogVisible] = useState(false);
+  const [deleteDialogUser, setDeleteDialogUser] = useState<AdminUser | null>(
+    null
+  );
+  const [isDeleteDialogVisible, setIsDeleteDialogVisible] = useState(false);
   const [createUserForm, setCreateUserForm] = useState(defaultCreateUserForm);
   const [createUserErrorMessage, setCreateUserErrorMessage] = useState("");
   const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [isCreatePasswordVisible, setIsCreatePasswordVisible] = useState(false);
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
   const photoPreviewUrlRef = useRef("");
   const createDialogCloseTimerRef = useRef<number | null>(null);
   const photoDialogCloseTimerRef = useRef<number | null>(null);
+  const deleteDialogCloseTimerRef = useRef<number | null>(null);
   const isLight = theme === "light";
   const locale = i18n.resolvedLanguage ?? i18n.language;
   const isAdmin = ["admin", "administrator"].includes(
@@ -169,6 +196,8 @@ const Employee = () => {
   const resetCreateUserForm = () => {
     setCreateUserForm(defaultCreateUserForm);
     setCreateUserErrorMessage("");
+    setIsCreatePasswordVisible(false);
+    setIsConfirmPasswordVisible(false);
   };
 
   const loadUsers = async () => {
@@ -278,13 +307,15 @@ const Employee = () => {
       username: createUserForm.username.trim(),
       email: createUserForm.email.trim(),
       password: createUserForm.password,
+      confirmPassword: createUserForm.confirmPassword,
     };
 
     if (
       !trimmedForm.fullName ||
       !trimmedForm.username ||
       !trimmedForm.email ||
-      !trimmedForm.password
+      !trimmedForm.password ||
+      !trimmedForm.confirmPassword
     ) {
       showCreateUserError("employee.createDialog.required");
       return;
@@ -300,11 +331,21 @@ const Employee = () => {
       return;
     }
 
+    if (trimmedForm.password !== trimmedForm.confirmPassword) {
+      showCreateUserError("employee.createDialog.passwordMismatch");
+      return;
+    }
+
     setIsCreatingUser(true);
     setCreateUserErrorMessage("");
 
     try {
-      await createUser(trimmedForm);
+      await createUser({
+        fullName: trimmedForm.fullName,
+        username: trimmedForm.username,
+        email: trimmedForm.email,
+        password: trimmedForm.password,
+      });
       await loadUsers();
       toast.success(t("employee.createDialog.success"));
       closeCreateDialog(true);
@@ -351,6 +392,45 @@ const Employee = () => {
       clearSelectedPhoto();
       setPhotoDialogUser(null);
     }, DIALOG_ANIMATION_MS);
+  };
+
+  const openDeleteDialog = (user: AdminUser) => {
+    if (deleteDialogCloseTimerRef.current) {
+      window.clearTimeout(deleteDialogCloseTimerRef.current);
+    }
+
+    setDeleteDialogUser(user);
+    setIsDeleteDialogVisible(false);
+    window.requestAnimationFrame(() => setIsDeleteDialogVisible(true));
+  };
+
+  const closeDeleteDialog = (force = false) => {
+    if (isDeletingUser && !force) return;
+
+    setIsDeleteDialogVisible(false);
+
+    deleteDialogCloseTimerRef.current = window.setTimeout(() => {
+      setDeleteDialogUser(null);
+    }, DIALOG_ANIMATION_MS);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteDialogUser) return;
+
+    setIsDeletingUser(true);
+
+    try {
+      await deleteUser(deleteDialogUser.id);
+      setUsers((currentUsers) =>
+        currentUsers.filter((user) => user.id !== deleteDialogUser.id)
+      );
+      toast.success(t("employee.deleteDialog.success"));
+      closeDeleteDialog(true);
+    } catch {
+      toast.error(t("employee.deleteDialog.error"));
+    } finally {
+      setIsDeletingUser(false);
+    }
   };
 
   const handlePhotoSelect = (file?: File) => {
@@ -408,6 +488,10 @@ const Employee = () => {
 
       if (photoDialogCloseTimerRef.current) {
         window.clearTimeout(photoDialogCloseTimerRef.current);
+      }
+
+      if (deleteDialogCloseTimerRef.current) {
+        window.clearTimeout(deleteDialogCloseTimerRef.current);
       }
     };
   }, []);
@@ -650,7 +734,7 @@ const Employee = () => {
               <button
                 type="button"
                 onClick={openCreateDialog}
-                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-95"
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-4 text-sm font-black text-white shadow-md shadow-red-950/15 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-500/25 active:scale-95"
                 aria-label={t("employee.createDialog.openAria", {
                   defaultValue: "Create employee",
                 })}
@@ -713,6 +797,10 @@ const Employee = () => {
                   user,
                   user.updatedAt
                 );
+                const userDisplayName =
+                  getUserDisplayName(user) || t("common.unnamedUser");
+                const deleteButtonClassName =
+                  "group flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-red-300 bg-transparent text-red-500 transition-all duration-200 ease-out hover:cursor-pointer hover:bg-red-500 hover:text-white hover:shadow-md hover:shadow-red-950/20 active:scale-90 sm:h-full sm:min-h-[58px] sm:w-12";
 
                 return (
                   <article
@@ -728,9 +816,7 @@ const Employee = () => {
                           onClick={() => openPhotoDialog(user)}
                           aria-label={t("employee.changePhotoAria", {
                             name:
-                              user.fullName ||
-                              user.username ||
-                              t("common.employeeAlt"),
+                            userDisplayName || t("common.employeeAlt"),
                           })}
                           className={`group relative flex size-11 shrink-0 overflow-hidden rounded-full border-2 text-sm font-black text-white shadow-sm ring-2 ring-transparent transition-all duration-200 hover:cursor-pointer hover:scale-105 hover:border-amber-300 hover:ring-amber-300/35 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-transparent active:scale-95 ${
                             profilePictureUrl
@@ -745,9 +831,7 @@ const Employee = () => {
                               key={profilePictureUrl}
                               src={profilePictureUrl}
                               alt={
-                                user.fullName ||
-                                user.username ||
-                                t("common.employeeAlt")
+                                userDisplayName || t("common.employeeAlt")
                               }
                               className="size-full object-cover transition-all duration-200 group-hover:scale-105 group-hover:opacity-45 group-hover:blur-[1px]"
                               onError={(event) => {
@@ -813,27 +897,47 @@ const Employee = () => {
                       </p>
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-center">
+                    <div className="flex items-center justify-between gap-2 sm:grid sm:grid-cols-[minmax(0,1fr)_3rem] sm:items-stretch sm:justify-end">
+                      <div className="hidden min-w-0 flex-col items-end justify-center gap-2 sm:flex">
+                        <span
+                          className={`inline-flex min-h-5 items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-black ${roleStyle.className}`}
+                        >
+                          <RoleIcon size={16} strokeWidth={2.6} />
+                          {formatRole(user.role, t)}
+                        </span>
+                        <span
+                          className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold ${
+                            isLight ? "text-gray-500" : "text-gray-400"
+                          }`}
+                        >
+                          <Clock3 size={14} />
+                          {formatLastLogin(user.loginedAt, locale, t)}
+                        </span>
+                      </div>
                       <span
-                        className={`hidden min-h-5 items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-black sm:inline-flex ${roleStyle.className}`}
-                      >
-                        <RoleIcon size={16} strokeWidth={2.6} />
-                        {formatRole(user.role, t)}
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 ${
+                        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold sm:hidden ${
                           isLight
                             ? "border-gray-200 bg-gray-50 text-gray-500"
                             : "border-gray-700 bg-gray-900 text-gray-400"
                         }`}
                       >
                         <Clock3 size={14} />
-                        {formatDate(
-                          user.loginedAt,
-                          locale,
-                          t("common.notAvailable")
-                        )}
+                        {formatLastLogin(user.loginedAt, locale, t)}
                       </span>
+                      <button
+                        type="button"
+                        onClick={() => openDeleteDialog(user)}
+                        aria-label={t("employee.deleteDialog.openAria", {
+                          name: userDisplayName,
+                        })}
+                        className={deleteButtonClassName}
+                      >
+                        <Trash2
+                          size={18}
+                          strokeWidth={2.5}
+                          className="transition-transform duration-200 group-hover:scale-110"
+                        />
+                      </button>
                     </div>
                   </article>
                 );
@@ -934,7 +1038,7 @@ const Employee = () => {
                     }
                     disabled={isCreatingUser}
                     autoComplete="name"
-                    className={`h-11 w-full rounded-xl border pl-10 pr-3 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+                    className={`h-12 w-full rounded-xl border pl-10 pr-3 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                       isLight
                         ? "border-gray-200 bg-gray-50 focus:border-amber-400"
                         : "border-gray-700 bg-gray-900 focus:border-amber-400"
@@ -965,7 +1069,7 @@ const Employee = () => {
                     }
                     disabled={isCreatingUser}
                     autoComplete="username"
-                    className={`h-11 w-full rounded-xl border px-3 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+                    className={`h-12 w-full rounded-xl border px-3 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                       isLight
                         ? "border-gray-200 bg-gray-50 focus:border-amber-400"
                         : "border-gray-700 bg-gray-900 focus:border-amber-400"
@@ -999,7 +1103,7 @@ const Employee = () => {
                       }
                       disabled={isCreatingUser}
                       autoComplete="email"
-                      className={`h-11 w-full rounded-xl border pl-10 pr-3 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`h-12 w-full rounded-xl border pl-10 pr-3 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                         isLight
                           ? "border-gray-200 bg-gray-50 focus:border-amber-400"
                           : "border-gray-700 bg-gray-900 focus:border-amber-400"
@@ -1009,40 +1113,135 @@ const Employee = () => {
                 </label>
               </div>
 
-              <label className="grid gap-2">
-                <span
-                  className={`text-xs font-black uppercase ${
-                    isLight ? "text-gray-500" : "text-gray-400"
-                  }`}
-                >
-                  {t("employee.createDialog.password", {
-                    defaultValue: "Password",
-                  })}
-                </span>
-                <div className="relative">
-                  <LockKeyhole
-                    size={17}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-red-500"
-                  />
-                  <input
-                    type="password"
-                    value={createUserForm.password}
-                    onChange={(event) =>
-                      handleCreateUserFieldChange(
-                        "password",
-                        event.currentTarget.value
-                      )
-                    }
-                    disabled={isCreatingUser}
-                    autoComplete="new-password"
-                    className={`h-11 w-full rounded-xl border pl-10 pr-3 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
-                      isLight
-                        ? "border-gray-200 bg-gray-50 focus:border-amber-400"
-                        : "border-gray-700 bg-gray-900 focus:border-amber-400"
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="grid gap-2">
+                  <span
+                    className={`text-xs font-black uppercase ${
+                      isLight ? "text-gray-500" : "text-gray-400"
                     }`}
-                  />
-                </div>
-              </label>
+                  >
+                    {t("employee.createDialog.password", {
+                      defaultValue: "Password",
+                    })}
+                  </span>
+                  <div className="relative">
+                    <LockKeyhole
+                      size={17}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-red-500"
+                    />
+                    <input
+                      type={isCreatePasswordVisible ? "text" : "password"}
+                      value={createUserForm.password}
+                      onChange={(event) =>
+                        handleCreateUserFieldChange(
+                          "password",
+                          event.currentTarget.value
+                        )
+                      }
+                      disabled={isCreatingUser}
+                      autoComplete="new-password"
+                      className={`h-12 w-full rounded-xl border pl-10 pr-11 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isLight
+                          ? "border-gray-200 bg-gray-50 focus:border-amber-400"
+                          : "border-gray-700 bg-gray-900 focus:border-amber-400"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIsCreatePasswordVisible((current) => !current)
+                      }
+                      disabled={isCreatingUser}
+                      aria-label={t(
+                        isCreatePasswordVisible
+                          ? "employee.createDialog.hidePassword"
+                          : "employee.createDialog.showPassword"
+                      )}
+                      className={`absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg transition-all duration-300 ease-out hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isLight
+                          ? "text-gray-500 hover:bg-gray-100 hover:text-red-500"
+                          : "text-gray-400 hover:bg-gray-800 hover:text-red-300"
+                      }`}
+                    >
+                      {isCreatePasswordVisible ? (
+                        <EyeOff
+                          size={17}
+                          className="transition-transform duration-300 ease-out"
+                        />
+                      ) : (
+                        <Eye
+                          size={17}
+                          className="transition-transform duration-300 ease-out"
+                        />
+                      )}
+                    </button>
+                  </div>
+                </label>
+
+                <label className="grid gap-2">
+                  <span
+                    className={`text-xs font-black uppercase ${
+                      isLight ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    {t("employee.createDialog.confirmPassword", {
+                      defaultValue: "Confirm password",
+                    })}
+                  </span>
+                  <div className="relative">
+                    <LockKeyhole
+                      size={17}
+                      className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-red-500"
+                    />
+                    <input
+                      type={isConfirmPasswordVisible ? "text" : "password"}
+                      value={createUserForm.confirmPassword}
+                      onChange={(event) =>
+                        handleCreateUserFieldChange(
+                          "confirmPassword",
+                          event.currentTarget.value
+                        )
+                      }
+                      disabled={isCreatingUser}
+                      autoComplete="new-password"
+                      className={`h-12 w-full rounded-xl border pl-10 pr-11 text-sm font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isLight
+                          ? "border-gray-200 bg-gray-50 focus:border-amber-400"
+                          : "border-gray-700 bg-gray-900 focus:border-amber-400"
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setIsConfirmPasswordVisible((current) => !current)
+                      }
+                      disabled={isCreatingUser}
+                      aria-label={t(
+                        isConfirmPasswordVisible
+                          ? "employee.createDialog.hidePassword"
+                          : "employee.createDialog.showPassword"
+                      )}
+                      className={`absolute right-2 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center rounded-lg transition-all duration-300 ease-out hover:cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isLight
+                          ? "text-gray-500 hover:bg-gray-100 hover:text-red-500"
+                          : "text-gray-400 hover:bg-gray-800 hover:text-red-300"
+                      }`}
+                    >
+                      {isConfirmPasswordVisible ? (
+                        <EyeOff
+                          size={17}
+                          className="transition-transform duration-300 ease-out"
+                        />
+                      ) : (
+                        <Eye
+                          size={17}
+                          className="transition-transform duration-300 ease-out"
+                        />
+                      )}
+                    </button>
+                  </div>
+                </label>
+              </div>
 
               <p
                 className={`min-h-5 text-sm font-semibold ${
@@ -1084,7 +1283,7 @@ const Employee = () => {
                 <button
                   type="submit"
                   disabled={isCreatingUser}
-                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-red-600 active:scale-98 disabled:cursor-not-allowed disabled:bg-red-300"
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-500/25 active:scale-98 disabled:cursor-not-allowed disabled:bg-red-300 disabled:text-white disabled:shadow-red-950/20"
                 >
                   {isCreatingUser && (
                     <LoaderCircle size={17} className="animate-spin" />
@@ -1095,6 +1294,129 @@ const Employee = () => {
                 </button>
               </div>
             </form>
+          </section>
+        </div>
+      )}
+
+      {deleteDialogUser && (
+        <div
+          role="presentation"
+          onClick={() => closeDeleteDialog()}
+          className={`fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 px-4 py-5 transition-all duration-300 ease-out sm:items-center ${
+            isDeleteDialogVisible
+              ? "pointer-events-auto opacity-100 backdrop-blur-[3px]"
+              : "pointer-events-none opacity-0 backdrop-blur-0"
+          }`}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-dialog-title"
+            onClick={(event) => event.stopPropagation()}
+            className={`w-full max-w-md rounded-2xl border p-6 shadow-2xl ring-1 transition-all duration-300 ease-out ${
+              isLight
+                ? "border-gray-200 bg-white text-gray-900 shadow-gray-950/20 ring-white/80"
+                : "border-gray-700 bg-gray-800 text-white shadow-black/40 ring-white/10"
+            } ${
+              isDeleteDialogVisible
+                ? "translate-y-0 scale-100 opacity-100"
+                : "translate-y-3 scale-95 opacity-0"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white shadow-md shadow-red-950/20">
+                <Trash2 size={22} />
+              </span>
+              <div className="min-w-0">
+                <p
+                  className={`text-xs font-black uppercase ${
+                    isLight ? "text-gray-500" : "text-gray-400"
+                  }`}
+                >
+                  {t("employee.deleteDialog.eyebrow")}
+                </p>
+                <h2 id="delete-user-dialog-title" className="mt-1 text-2xl font-black">
+                  {t("employee.deleteDialog.title")}
+                </h2>
+              </div>
+            </div>
+
+            <p
+              className={`mt-5 text-sm font-semibold leading-6 ${
+                isLight ? "text-gray-600" : "text-gray-300"
+              }`}
+            >
+              {t("employee.deleteDialog.message", {
+                name:
+                  getUserDisplayName(deleteDialogUser) ||
+                  t("common.unnamedUser"),
+              })}
+            </p>
+
+            <div
+              className={`mt-4 rounded-xl border p-3 ${
+                isLight
+                  ? "border-gray-200 bg-gray-50"
+                  : "border-gray-700 bg-gray-900"
+              }`}
+            >
+              <div className="flex min-w-0 items-stretch justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-black">
+                    {getUserDisplayName(deleteDialogUser) ||
+                      t("common.unnamedUser")}
+                  </p>
+                  <p
+                    className={`mt-1 truncate text-sm font-semibold ${
+                      isLight ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    {deleteDialogUser.email || deleteDialogUser.username || "-"}
+                  </p>
+                </div>
+                {(() => {
+                  const deleteRoleStyle = getRoleStyle(deleteDialogUser.role);
+                  const DeleteRoleIcon = deleteRoleStyle.icon;
+
+                  return (
+                    <span
+                      className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-black ${deleteRoleStyle.className}`}
+                    >
+                      <DeleteRoleIcon size={14} strokeWidth={2.6} />
+                      {formatRole(deleteDialogUser.role, t)}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => closeDeleteDialog()}
+                disabled={isDeletingUser}
+                className={`h-11 rounded-xl border px-5 font-bold transition-all duration-200 hover:cursor-pointer active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                  isLight
+                    ? "border-gray-200 bg-white hover:bg-gray-100"
+                    : "border-gray-700 bg-gray-900 hover:bg-gray-700"
+                }`}
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDeleteUser()}
+                disabled={isDeletingUser}
+                className="flex h-11 items-center justify-center gap-2 rounded-xl bg-red-500 px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-950/20 active:scale-95 disabled:cursor-not-allowed disabled:bg-red-300 disabled:text-white disabled:shadow-red-950/20"
+              >
+                {isDeletingUser && (
+                  <LoaderCircle size={17} className="animate-spin" />
+                )}
+                {isDeletingUser
+                  ? t("employee.deleteDialog.deleting")
+                  : t("employee.deleteDialog.confirm")}
+              </button>
+            </div>
           </section>
         </div>
       )}
@@ -1231,7 +1553,7 @@ const Employee = () => {
                   className={`flex h-11 flex-1 items-center justify-center gap-2 rounded-xl px-4 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 active:scale-98 ${
                     isPhotoSaving
                       ? "cursor-not-allowed bg-red-300"
-                      : "bg-red-500 hover:cursor-pointer hover:bg-red-600"
+                      : "bg-red-500 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-md hover:shadow-amber-500/25"
                   }`}
                 >
                   <ImagePlus size={17} />
@@ -1305,7 +1627,7 @@ const Employee = () => {
               className={`h-11 rounded-xl px-5 font-bold text-white shadow-md shadow-red-950/20 transition-all duration-200 active:scale-98 ${
                 isPhotoSaving || !selectedPhoto
                   ? "cursor-not-allowed bg-red-300"
-                  : "bg-red-500 hover:cursor-pointer hover:bg-red-600"
+                  : "bg-red-500 hover:cursor-pointer hover:bg-amber-400 hover:text-gray-950 hover:shadow-md hover:shadow-amber-500/25"
               }`}
             >
               {isPhotoSaving

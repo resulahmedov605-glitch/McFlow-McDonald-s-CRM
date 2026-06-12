@@ -224,7 +224,7 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={!canSubmit || isSubmitting}
-                className="group flex w-full items-center justify-center rounded-lg border border-amber-300 bg-red-500 px-4 py-3 text-lg font-bold text-white shadow-md transition-all duration-200 ease-in-out hover:cursor-pointer hover:scale-101 hover:bg-red-600 hover:shadow-amber-500/20 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100"
+                className="group flex w-full items-center justify-center rounded-lg border border-amber-300 bg-red-500 px-4 py-3 text-lg font-bold text-white shadow-md transition-all duration-200 ease-in-out hover:cursor-pointer hover:scale-101 hover:bg-amber-400 hover:text-gray-950 hover:shadow-amber-500/25 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 disabled:hover:bg-red-500 disabled:hover:text-white"
               >
                 <span>
                   {isSubmitting ? t("login.checking") : t("login.submit")}
