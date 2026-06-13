@@ -273,28 +273,39 @@ const VerifyQR = () => {
               {t("verify.code")}
             </label>
             <div
-              className="grid grid-cols-6 gap-2 sm:gap-3"
+              className="grid grid-cols-[repeat(3,minmax(0,1fr))_auto_repeat(3,minmax(0,1fr))] items-center gap-2 sm:gap-3"
               aria-labelledby="verify-code-label"
             >
               {verificationCode.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={(input) => {
-                    inputRefs.current[index] = input;
-                  }}
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  autoComplete={index === 0 ? "one-time-code" : "off"}
-                  value={digit}
-                  maxLength={1}
-                  aria-label={t("verify.digitAria", { index: index + 1 })}
-                  onChange={(event) => handleCodeChange(index, event)}
-                  onKeyDown={(event) => handleCodeKeyDown(index, event)}
-                  onPaste={(event) => handleCodePaste(index, event)}
-                  className={`${inputClassName} px-0 text-center text-2xl`}
-                  disabled={isVerifying}
-                />
+                <div key={index} className="contents">
+                  <input
+                    ref={(input) => {
+                      inputRefs.current[index] = input;
+                    }}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete={index === 0 ? "one-time-code" : "off"}
+                    value={digit}
+                    maxLength={1}
+                    aria-label={t("verify.digitAria", { index: index + 1 })}
+                    onChange={(event) => handleCodeChange(index, event)}
+                    onKeyDown={(event) => handleCodeKeyDown(index, event)}
+                    onPaste={(event) => handleCodePaste(index, event)}
+                    className={`${inputClassName} px-0 text-center text-2xl`}
+                    disabled={isVerifying}
+                  />
+                  {index === 2 && (
+                    <span
+                      aria-hidden="true"
+                      className={`text-center text-2xl font-bold ${
+                        isLight ? "text-gray-500" : "text-gray-300"
+                      }`}
+                    >
+                      –
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
           </div>
